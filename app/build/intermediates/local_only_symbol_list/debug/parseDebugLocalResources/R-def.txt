@@ -1,0 +1,34 @@
+R_DEF: Internal format may change without notice
+local
+drawable ic_launcher_background
+drawable stepminilogo
+drawable stepstacklogo
+drawable stepstacklogo_background
+drawable stepstacksplashscreen
+drawable workout_abs_2
+drawable workout_abs_core
+drawable workout_barbell
+drawable workout_bicep_curls
+drawable workout_crunches
+drawable workout_deadlift
+drawable workout_dumbbell_row
+drawable workout_fitness_class
+drawable workout_gym_2
+drawable workout_gym_weights
+drawable workout_meditation_beach
+drawable workout_running_2
+drawable workout_running_prep
+drawable workout_trx_flyes
+drawable workout_yoga_3
+drawable workout_yoga_advanced
+drawable workout_yoga_cobra
+drawable workout_yoga_lunge
+drawable workout_yoga_silhouette
+drawable workout_yoga_sunset
+mipmap ic_launcher
+mipmap ic_launcher_foreground
+mipmap ic_launcher_round
+mipmap stepstack
+mipmap stepstacklogo
+mipmap stepstacklogo_round
+string app_name
