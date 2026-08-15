@@ -34,9 +34,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.stepstack.app.data.DailyActivity
 import com.stepstack.app.data.Workout
 import com.stepstack.app.data.AppNotification
+import com.stepstack.app.data.Achievement
 import com.stepstack.app.ui.theme.*
 import kotlin.math.min
 
@@ -50,7 +54,7 @@ fun MovementScoreRing(
     stroke: Dp = 20.dp,
 ) {
     val stepScore = steps
-    val workoutScore = workoutMinutes * 130
+    val workoutScore = workoutMinutes * 120
     val total = stepScore + workoutScore
     val progress = if (targetScore > 0) (total.toFloat() / targetScore) else 0f
     val animated by animateFloatAsState(
@@ -200,10 +204,8 @@ fun WeekStrip(
             val met = day.movementScore >= targetScore
             val progress = (day.movementScore.toFloat() / targetScore).coerceIn(0f, 1f)
             
-            // Calculate actual day label using java.time for accuracy
             val date = java.time.LocalDate.ofEpochDay(day.epochDay)
             val dayOfWeek = date.dayOfWeek.value // 1 (Mon) to 7 (Sun)
-            // dayLabels is Sun, Mon, Tue... (Sun is 0 in some contexts, but let's be careful)
             val label = dayLabels[if (dayOfWeek == 7) 0 else dayOfWeek].take(1)
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -260,6 +262,15 @@ fun WorkoutSessionCard(
         if (resId != 0) resId else workout.thumbnailUrl.ifBlank { null }
     }
 
+    val imageRequest = remember(imageModel) {
+        ImageRequest.Builder(context)
+            .data(imageModel)
+            .crossfade(true)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .build()
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -274,10 +285,11 @@ fun WorkoutSessionCard(
             Box(modifier = Modifier.fillMaxWidth().height(160.dp)) { 
                 if (imageModel != null) {
                     AsyncImage(
-                        model = imageModel,
+                        model = imageRequest,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
+                        placeholder = androidx.compose.ui.graphics.painter.ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                         error = androidx.compose.ui.graphics.painter.ColorPainter(primary.copy(alpha = 0.1f)),
                         fallback = androidx.compose.ui.graphics.painter.ColorPainter(primary.copy(alpha = 0.1f))
                     )
@@ -300,7 +312,6 @@ fun WorkoutSessionCard(
                     }
                 }
                 
-                // Overlay for text readability
                 Box(
                     Modifier
                         .fillMaxSize()
@@ -400,6 +411,125 @@ fun WorkoutSessionCard(
                     fontSize = 13.sp
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun AchievementBadge(a: Achievement) {
+    val unlockedColor = when(a.id) {
+        "a1" -> Color(0xFF4FC3F7)
+        "a2" -> Color(0xFF81C784)
+        "a3" -> Color(0xFFFFB74D)
+        "a4" -> Color(0xFFE57373)
+        "a5" -> Color(0xFF9575CD)
+        "a6" -> Color(0xFFFFD54F)
+        "a7" -> Color(0xFF4DB6AC)
+        "a8" -> Color(0xFFBA68C8)
+        "a9" -> Color(0xFFFF8A65)
+        "a10" -> Color(0xFF90A4AE)
+        "a11" -> Color(0xFFAED581)
+        "a12" -> Color(0xFF7986CB)
+        else -> Coral500
+    }
+    
+    val color = if (a.unlocked) unlockedColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+    
+    Card(
+        modifier = Modifier.width(150.dp).height(200.dp),
+        shape = RoundedCornerShape(32.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (a.unlocked) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        elevation = if (a.unlocked) CardDefaults.cardElevation(defaultElevation = 6.dp) else CardDefaults.cardElevation(0.dp),
+        border = if (a.unlocked) androidx.compose.foundation.BorderStroke(2.dp, Brush.verticalGradient(listOf(unlockedColor, unlockedColor.copy(alpha = 0.4f)))) else null
+    ) {
+        Column(
+            Modifier.padding(16.dp).fillMaxSize(), 
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(90.dp)) {
+                if (a.unlocked) {
+                    Surface(
+                        Modifier.size(70.dp).scale(1.4f),
+                        shape = CircleShape,
+                        color = unlockedColor.copy(alpha = 0.15f)
+                    ) {}
+                    Surface(
+                        Modifier.size(55.dp).scale(1.2f),
+                        shape = CircleShape,
+                        color = unlockedColor.copy(alpha = 0.1f)
+                    ) {}
+                }
+                
+                Surface(
+                    Modifier.size(64.dp), 
+                    shape = CircleShape, 
+                    color = if (a.unlocked) unlockedColor.copy(alpha = 0.2f) else Color.Transparent,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = when(a.icon) {
+                                "footprint" -> Icons.Default.DirectionsWalk
+                                "calendar" -> Icons.Default.CalendarToday
+                                "steps" -> Icons.Default.DirectionsRun
+                                "flame" -> Icons.Default.Whatshot
+                                "dumbbell" -> Icons.Default.FitnessCenter
+                                "trophy" -> Icons.Default.EmojiEvents
+                                "explore" -> Icons.Default.Explore
+                                "water_drop" -> Icons.Default.Opacity
+                                "wb_sunny" -> Icons.Default.WbSunny
+                                "bedtime" -> Icons.Default.Bedtime
+                                "trending_up" -> Icons.Default.TrendingUp
+                                "insights" -> Icons.Default.Insights
+                                else -> Icons.Default.EmojiEvents
+                            },
+                            contentDescription = null,
+                            tint = color,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                }
+                
+                if (!a.unlocked) {
+                    Box(
+                        Modifier
+                            .size(26.dp)
+                            .align(Alignment.BottomEnd)
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.Lock, 
+                            null, 
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+            }
+            
+            Spacer(Modifier.height(12.dp))
+            Text(
+                a.title, 
+                style = MaterialTheme.typography.titleMedium, 
+                fontWeight = FontWeight.ExtraBold, 
+                maxLines = 1, 
+                textAlign = TextAlign.Center,
+                color = if (a.unlocked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                a.description, 
+                style = MaterialTheme.typography.bodySmall, 
+                color = MaterialTheme.colorScheme.onSurfaceVariant, 
+                maxLines = 2, 
+                textAlign = TextAlign.Center, 
+                lineHeight = 14.sp,
+                fontSize = 11.sp
+            )
         }
     }
 }
@@ -545,11 +675,15 @@ fun BarChart(
     modifier: Modifier = Modifier,
     barColor: Color? = null,
     highlightLast: Boolean = false,
-    viewType: ChartViewType = ChartViewType.WEEK
+    viewType: ChartViewType = ChartViewType.WEEK,
+    showExtremes: Boolean = true
 ) {
     val actualBarColor = barColor ?: MaterialTheme.colorScheme.primary
     val maxVal = (values.maxOrNull() ?: 1f).coerceAtLeast(1f)
     
+    val maxIndex = if (showExtremes) values.indices.maxByOrNull { values[it] } ?: -1 else -1
+    val minIndex = if (showExtremes && values.any { it > 0 }) values.indices.filter { values[it] > 0 }.minByOrNull { values[it] } ?: -1 else -1
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(32.dp),
@@ -558,10 +692,7 @@ fun BarChart(
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
         Column(Modifier.padding(24.dp)) {
-            // Chart Title / Header could go here if needed
-            
             Box(modifier = Modifier.height(200.dp).fillMaxWidth()) {
-                // Background Grid
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.SpaceBetween
@@ -581,24 +712,26 @@ fun BarChart(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                 ) {
                     val barWidth = when(viewType) {
-                        ChartViewType.DAY -> 40.dp
-                        ChartViewType.WEEK -> 20.dp
-                        ChartViewType.MONTH -> 8.dp
+                        ChartViewType.DAY -> 6.dp
+                        ChartViewType.WEEK -> 24.dp
+                        ChartViewType.MONTH -> 12.dp
                     }
                     
                     values.forEachIndexed { i, v ->
-                        val frac = (v / maxVal).coerceIn(0.02f, 1f)
+                        val frac = (v / maxVal).coerceIn(0.01f, 1f)
                         val animated by animateFloatAsState(
                             targetValue = frac,
                             animationSpec = tween(
-                                durationMillis = 1000,
-                                delayMillis = i * 50,
+                                durationMillis = 800,
+                                delayMillis = i * (if (viewType == ChartViewType.DAY) 8 else 40),
                                 easing = FastOutSlowInEasing
                             ),
                             label = "bar$i"
                         )
                         
                         val isHighlighted = highlightLast && i == values.lastIndex
+                        val isMax = i == maxIndex && v > 0
+                        val isMin = i == minIndex && v > 0
                         
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -610,16 +743,14 @@ fun BarChart(
                                     .fillMaxWidth(),
                                 contentAlignment = Alignment.BottomCenter,
                             ) {
-                                // Background track
                                 Box(
                                     Modifier
                                         .width(barWidth)
                                         .fillMaxHeight()
                                         .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.05f))
                                 )
                                 
-                                // Data bar
                                 Box(
                                     Modifier
                                         .width(barWidth)
@@ -627,44 +758,59 @@ fun BarChart(
                                         .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                                         .background(
                                             brush = Brush.verticalGradient(
-                                                if (isHighlighted) {
-                                                    listOf(Coral500, Coral500.copy(alpha = 0.6f))
-                                                } else {
-                                                    when(viewType) {
-                                                        ChartViewType.DAY -> listOf(Teal600, Teal600.copy(alpha = 0.6f))
-                                                        ChartViewType.WEEK -> listOf(actualBarColor, actualBarColor.copy(alpha = 0.6f))
-                                                        ChartViewType.MONTH -> listOf(Lime500, Lime500.copy(alpha = 0.6f))
-                                                    }
+                                                when {
+                                                    isMax -> listOf(Lime500, Lime500.copy(alpha = 0.7f))
+                                                    isMin -> listOf(Coral500, Coral500.copy(alpha = 0.7f))
+                                                    isHighlighted -> listOf(actualBarColor.copy(alpha = 0.9f), actualBarColor.copy(alpha = 0.5f))
+                                                    else -> listOf(actualBarColor, actualBarColor.copy(alpha = 0.6f))
                                                 }
                                             )
                                         ),
                                 )
                             }
                             if (labels.isNotEmpty()) {
-                                Spacer(Modifier.height(12.dp))
+                                Spacer(Modifier.height(8.dp))
                                 val labelText = labels.getOrElse(i) { "" }
-                                // Show every label for week, but skip some for month to avoid overlap
+                                
                                 val shouldShowLabel = when(viewType) {
-                                    ChartViewType.MONTH -> i % 5 == 0 || i == values.lastIndex
-                                    else -> true
+                                    ChartViewType.DAY -> i % 4 == 0 || i == values.lastIndex
+                                    else -> labelText.isNotEmpty()
                                 }
                                 
-                                if (shouldShowLabel) {
+                                if (shouldShowLabel && labelText.isNotEmpty()) {
                                     Text(
                                         labelText,
                                         style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = if (viewType == ChartViewType.MONTH) 9.sp else 10.sp
+                                            fontSize = if (viewType == ChartViewType.DAY) 7.sp else 9.sp
                                         ),
-                                        color = if (isHighlighted) Coral500 else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = if (isHighlighted) FontWeight.ExtraBold else FontWeight.Bold,
+                                        color = when {
+                                            isMax -> Lime500
+                                            isMin -> Coral500
+                                            isHighlighted -> actualBarColor
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        fontWeight = if (isHighlighted || isMax || isMin) FontWeight.Black else FontWeight.Bold,
                                         maxLines = 1
                                     )
                                 } else {
-                                    Spacer(Modifier.height(14.dp)) // Maintain spacing
+                                    Spacer(Modifier.height(12.dp))
                                 }
                             }
                         }
                     }
+                }
+            }
+            
+            if (showExtremes && values.any { it > 0 }) {
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LegendDot(Lime500, "Most Active")
+                    Spacer(Modifier.width(24.dp))
+                    LegendDot(Coral500, "Least Active")
                 }
             }
         }

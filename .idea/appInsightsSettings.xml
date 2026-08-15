@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.stepstack.app" />
+                  <option name="mobileSdkAppId" value="1:302877698779:android:1e99064cde61ad7dd2fafe" />
+                  <option name="projectId" value="stepstack-ee074" />
+                  <option name="projectNumber" value="302877698779" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

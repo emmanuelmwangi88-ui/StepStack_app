@@ -1,7 +1,9 @@
-#Fri Aug 07 21:11:14 EAT 2026
+#Sat Aug 15 18:31:37 EAT 2026
 base.0=C\:\\Users\\user\\AndroidStudioProjects\\StepStack\\app\\build\\intermediates\\dex\\debug\\mergeExtDexDebug\\classes.dex
 base.1=C\:\\Users\\user\\AndroidStudioProjects\\StepStack\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\0\\classes.dex
 base.10=C\:\\Users\\user\\AndroidStudioProjects\\StepStack\\app\\build\\intermediates\\dex\\debug\\mergeExtDexDebug\\classes3.dex
+base.11=C\:\\Users\\user\\AndroidStudioProjects\\StepStack\\app\\build\\intermediates\\dex\\debug\\mergeExtDexDebug\\classes4.dex
+base.12=C\:\\Users\\user\\AndroidStudioProjects\\StepStack\\app\\build\\intermediates\\dex\\debug\\mergeExtDexDebug\\classes5.dex
 base.2=C\:\\Users\\user\\AndroidStudioProjects\\StepStack\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\13\\classes.dex
 base.3=C\:\\Users\\user\\AndroidStudioProjects\\StepStack\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\14\\classes.dex
 base.4=C\:\\Users\\user\\AndroidStudioProjects\\StepStack\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\15\\classes.dex
@@ -13,6 +15,8 @@ base.9=C\:\\Users\\user\\AndroidStudioProjects\\StepStack\\app\\build\\intermedi
 path.0=classes.dex
 path.1=0/classes.dex
 path.10=classes3.dex
+path.11=classes4.dex
+path.12=classes5.dex
 path.2=13/classes.dex
 path.3=14/classes.dex
 path.4=15/classes.dex
@@ -24,6 +28,8 @@ path.9=classes2.dex
 renamed.0=classes.dex
 renamed.1=classes2.dex
 renamed.10=classes11.dex
+renamed.11=classes12.dex
+renamed.12=classes13.dex
 renamed.2=classes3.dex
 renamed.3=classes4.dex
 renamed.4=classes5.dex

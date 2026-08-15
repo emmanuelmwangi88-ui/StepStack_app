@@ -22,6 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.stepstack.app.data.Exercise
 import com.stepstack.app.data.ExerciseType
 import com.stepstack.app.data.Workout
@@ -130,13 +133,23 @@ private fun HeroSection(workout: Workout) {
         if (resId != 0) resId else workout.thumbnailUrl.ifBlank { null }
     }
 
+    val imageRequest = remember(imageModel) {
+        ImageRequest.Builder(context)
+            .data(imageModel)
+            .crossfade(true)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .build()
+    }
+
     Box(modifier = Modifier.fillMaxWidth().height(260.dp)) {
         if (imageModel != null) {
             AsyncImage(
-                model = imageModel,
+                model = imageRequest,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
+                placeholder = androidx.compose.ui.graphics.painter.ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
                 error = androidx.compose.ui.graphics.painter.ColorPainter(primary.copy(alpha = 0.8f)),
                 fallback = androidx.compose.ui.graphics.painter.ColorPainter(primary.copy(alpha = 0.8f))
             )
@@ -263,6 +276,7 @@ private fun InfoStat(icon: ImageVector, value: String, label: String) {
 
 @Composable
 private fun ExerciseItem(exercise: Exercise, index: Int) {
+    val context = LocalContext.current
     val primary = MaterialTheme.colorScheme.primary
     val secondary = MaterialTheme.colorScheme.secondary
     
@@ -277,14 +291,23 @@ private fun ExerciseItem(exercise: Exercise, index: Int) {
     ) {
         Column {
             if (exercise.demoMediaUrl.isNotBlank()) {
+                val exerciseImageRequest = remember(exercise.demoMediaUrl) {
+                    ImageRequest.Builder(context)
+                        .data(exercise.demoMediaUrl)
+                        .crossfade(true)
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .diskCachePolicy(CachePolicy.ENABLED)
+                        .build()
+                }
                 AsyncImage(
-                    model = exercise.demoMediaUrl,
+                    model = exerciseImageRequest,
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(140.dp)
                         .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    placeholder = androidx.compose.ui.graphics.painter.ColorPainter(MaterialTheme.colorScheme.surfaceVariant)
                 )
             }
             

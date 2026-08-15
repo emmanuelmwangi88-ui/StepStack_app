@@ -168,7 +168,8 @@ fun AppNavHost(
                                 durationActualMin = s.durationMinutes,
                                 completedPercent = 100,
                                 exercisesCompleted = s.exercisesCompleted,
-                                caloriesBurned = s.caloriesBurned
+                                caloriesBurned = s.caloriesBurned,
+                                startTimeMillis = s.startTimeMillis
                             )
                         )
                         navController.navigate(Route.Workouts.route) {

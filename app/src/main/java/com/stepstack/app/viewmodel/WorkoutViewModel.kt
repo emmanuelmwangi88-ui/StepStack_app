@@ -351,7 +351,8 @@ class WorkoutViewModel : ViewModel() {
             workoutName = state.workout.name,
             durationMinutes = state.workout.durationMin,
             caloriesBurned = state.workout.calories,
-            exercisesCompleted = state.workout.exercises.size
+            exercisesCompleted = state.workout.exercises.size,
+            startTimeMillis = state.startTimeMillis
         )
         _activeWorkout.value = state.copy(isFinished = true)
     }

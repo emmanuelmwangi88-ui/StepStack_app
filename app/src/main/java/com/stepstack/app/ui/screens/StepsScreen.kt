@@ -63,6 +63,25 @@ fun StepsScreen(
             .padding(bottom = padding.calculateBottomPadding().coerceAtLeast(0.dp) + 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        if (!vm.isBatteryOptimizationIgnored) {
+            Spacer(Modifier.height(12.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                onClick = { vm.requestIgnoreBatteryOptimizations(context) }
+            ) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.BatteryAlert, null, tint = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Accuracy Warning", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                        Text("Battery optimization is skipping steps in background. Tap to fix.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                    }
+                }
+            }
+        }
+
         Spacer(Modifier.height(12.dp))
         
         // Large circular progress ring
@@ -141,7 +160,7 @@ fun StepsScreen(
                     Icon(Icons.Default.Timer, null, tint = MaterialTheme.colorScheme.secondary)
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        "%,d steps to go ≈ %d min walk".format(remaining, (remaining / 100).coerceAtLeast(1)),
+                        "%,d steps to go ≈ %d min brisk walk".format(remaining, (remaining / 120).coerceAtLeast(1)),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -205,7 +224,16 @@ fun StepsScreen(
                     when (viewMode) {
                         "Day" -> {
                             val hourly = vm.dayHourlyActivity()
-                            val labels = listOf("12a", "4a", "8a", "12p", "4p", "8p")
+                            val labels = List(24) { i -> 
+                                when {
+                                    i == 0 -> "12a"
+                                    i == 6 -> "6a"
+                                    i == 12 -> "12p"
+                                    i == 18 -> "6p"
+                                    i == 23 -> "11p"
+                                    else -> ""
+                                }
+                            }
                             Triple(hourly.map { it.toFloat() }, labels, ChartViewType.DAY)
                         }
                         "Week" -> {
@@ -214,9 +242,8 @@ fun StepsScreen(
                             Triple(week.map { it.steps.toFloat() }, labels, ChartViewType.WEEK)
                         }
                         "Month" -> {
-                            val month = vm.monthActivities()
-                            val labels = listOf("1st", "10th", "20th", "30th")
-                            Triple(month.map { it.steps.toFloat() }, labels, ChartViewType.MONTH)
+                            val data = vm.last12MonthsActivities()
+                            Triple(data.map { it.second }, data.map { it.first }, ChartViewType.MONTH)
                         }
                         else -> Triple(emptyList<Float>(), emptyList<String>(), ChartViewType.WEEK)
                     }

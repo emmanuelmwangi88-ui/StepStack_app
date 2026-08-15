@@ -104,6 +104,7 @@ data class WorkoutPlan(
 data class User(
     val name: String = "",
     val email: String = "",
+    val photoUrl: String = "",
     val goal: GoalType = GoalType.GENERAL_HEALTH,
     val activityLevel: ActivityLevel = ActivityLevel.LIGHT,
     val equipment: Equipment = Equipment.NONE,
@@ -174,7 +175,8 @@ data class DailyActivity(
     val distanceMeters: Int = 0,
     val caloriesBurned: Int = 0
 ) {
-    val movementScore: Int get() = steps + (workoutMinutes * 130)
+    val movementScore: Int 
+        get() = steps + (workoutMinutes * 120) + (if (steps >= goalForDay && goalForDay > 0) 500 else 0)
 }
 
 @Serializable
@@ -198,7 +200,8 @@ data class WorkoutSummary(
     val workoutName: String,
     val durationMinutes: Int,
     val caloriesBurned: Int,
-    val exercisesCompleted: Int
+    val exercisesCompleted: Int,
+    val startTimeMillis: Long = System.currentTimeMillis()
 )
 
 @Serializable
@@ -210,7 +213,8 @@ data class ActiveWorkoutState(
     val secondsRemaining: Int = 0,
     val elapsedSeconds: Int = 0,
     val isPaused: Boolean = false,
-    val isFinished: Boolean = false
+    val isFinished: Boolean = false,
+    val startTimeMillis: Long = System.currentTimeMillis()
 ) {
     val currentExercise: Exercise get() = workout.exercises[currentExerciseIndex]
     val totalExercises: Int get() = workout.exercises.size

@@ -45,6 +45,7 @@ class StepTrackerService : Service() {
     private lateinit var counterManager: StepCounterManager
     private lateinit var db: AppDatabase
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
     
     private val NOTIFICATION_ID = 101
     private val CHANNEL_ID = "step_tracker_channel"
@@ -62,6 +63,11 @@ class StepTrackerService : Service() {
         db = AppDatabase.getDatabase(this)
         counterManager = StepCounterManager(this)
         
+        // Acquire partial wake lock to keep sensors alive
+        val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        wakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "StepStack:StepTrackerWakeLock")
+        wakeLock?.acquire()
+
         createNotificationChannel()
         startForegroundServiceWithNotification()
 
@@ -117,21 +123,25 @@ class StepTrackerService : Service() {
     private fun checkDayRollover() {
         val today = LocalDate.now().toEpochDay()
         val prefs = getSharedPreferences("stepstack_tracking_prefs", MODE_PRIVATE)
-        val lastDay = prefs.getLong("last_tracked_day", today)
+        val lastDay = prefs.getLong("last_tracked_day", -1L)
         
-        if (today > lastDay) {
+        if (lastDay != -1L && today > lastDay) {
             Log.i("StepTrackerService", "New day detected ($today). Resetting today's baseline.")
-            // 1. Save final count for the old day
+            // 1. Save final count for the old day explicitly
             saveStepsToDb(currentSteps, lastDay)
             
-            // 2. Reset manager baseline
+            // 2. Reset manager baseline using the latest raw value
             counterManager.resetForNewDay()
             
             // 3. Update state
             prefs.edit().putLong("last_tracked_day", today).apply()
             currentSteps = 0
             lastSavedSteps = 0
+            _todaySteps.value = 0
             updateNotification()
+        } else if (lastDay == -1L) {
+            // Initialize last_tracked_day on first run
+            prefs.edit().putLong("last_tracked_day", today).apply()
         }
     }
 
@@ -221,6 +231,7 @@ class StepTrackerService : Service() {
         // Final save before death
         saveStepsToDb(currentSteps)
         counterManager.stopTracking()
+        wakeLock?.let { if (it.isHeld) it.release() }
         serviceScope.cancel()
         super.onDestroy()
     }

@@ -3,6 +3,8 @@ package com.stepstack.app.viewmodel
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.util.Log
 import androidx.compose.runtime.*
@@ -46,6 +48,7 @@ class AppViewModel : ViewModel() {
     val waterTarget = 8
     
     var energyLevel by mutableStateOf("Okay") // Low, Okay, Great
+    var isBatteryOptimizationIgnored by mutableStateOf(true)
 
     val activityHistory = mutableStateListOf<DailyActivity>()
     val sessions = mutableStateListOf<WorkoutSession>()
@@ -61,17 +64,38 @@ class AppViewModel : ViewModel() {
 
     var isWalking by mutableStateOf(false)
     var walkSeconds by mutableIntStateOf(0)
+    var walkStartTimeMillis by mutableLongStateOf(0L)
+    var walkStartSteps by mutableIntStateOf(0)
+    var walkCurrentSteps by mutableIntStateOf(0)
 
-    val today: Long get() = java.time.LocalDate.now().toEpochDay()
+    var currentDay by mutableLongStateOf(java.time.LocalDate.now().toEpochDay())
+        private set
+
+    val today: Long get() = currentDay
     lateinit var notificationSystem: NotificationSystem
 
     private lateinit var db: AppDatabase
     private var prefs: SharedPreferences? = null
 
     private var healthConnectClient: androidx.health.connect.client.HealthConnectClient? = null
+    private var toneGenerator: ToneGenerator? = null
 
     init {
         achievements.addAll(SampleData.achievements)
+        try {
+            toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100)
+        } catch (e: Exception) {
+            Log.e("AppViewModel", "ToneGenerator init failed", e)
+        }
+    }
+
+    private fun playAchievementSound() {
+        if (!soundCues) return
+        viewModelScope.launch {
+            toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 200)
+            delay(250)
+            toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 300)
+        }
     }
 
     fun loadData(context: Context) {
@@ -83,6 +107,11 @@ class AppViewModel : ViewModel() {
         if (androidx.health.connect.client.HealthConnectClient.getSdkStatus(context) == androidx.health.connect.client.HealthConnectClient.SDK_AVAILABLE) {
             healthConnectClient = androidx.health.connect.client.HealthConnectClient.getOrCreate(context)
         }
+
+        val pm = context.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        isBatteryOptimizationIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            pm.isIgnoringBatteryOptimizations(context.packageName)
+        } else true
         
         viewModelScope.launch {
             // Seed workouts
@@ -103,14 +132,16 @@ class AppViewModel : ViewModel() {
                 activityHistory.sortBy { it.epochDay }
             }
 
-            // Real-time listener for today's activity
+            // Real-time listener for today's activity and day-change detection
             launch {
-                var currentDay = -1L
+                var lastCheckedDay = today
                 var job: Job? = null
                 while (isActive) {
-                    val t = today
-                    if (t != currentDay) {
-                        currentDay = t
+                    val t = java.time.LocalDate.now().toEpochDay()
+                    if (t != lastCheckedDay) {
+                        lastCheckedDay = t
+                        currentDay = t // Update state to trigger UI refresh
+                        
                         job?.cancel()
                         job = launch {
                             db.activityDao().observeActivityForDay(t).collect { entity ->
@@ -125,10 +156,17 @@ class AppViewModel : ViewModel() {
                                 }
                             }
                         }
+                        
+                        // Reset daily transient states
+                        waterIntake.intValue = 0
+                        isWalking = false
+                        walkCurrentSteps = 0
+                        
                         ensureTodayActivity()
                         updateStreak()
+                        saveData() // Persist reset state
                     }
-                    delay(30000)
+                    delay(5000) // Check more frequently (every 5 seconds)
                 }
             }
 
@@ -170,6 +208,9 @@ class AppViewModel : ViewModel() {
                     } else {
                         ensureTodayActivity()
                     }
+                    if (isWalking) {
+                        walkCurrentSteps = (steps - walkStartSteps).coerceAtLeast(0)
+                    }
                 }
             }
         }
@@ -190,6 +231,7 @@ class AppViewModel : ViewModel() {
             putBoolean("health_connect_linked", healthConnectLinked)
             apply()
         }
+        syncWithFirebase()
     }
 
     fun updateProfile(context: Context, name: String, goal: GoalType, level: ActivityLevel, equipment: Equipment) {
@@ -197,6 +239,11 @@ class AppViewModel : ViewModel() {
         updateStreak()
         saveData(context)
         checkAchievements()
+    }
+
+    fun updateProfilePhoto(context: Context, photoUrl: String) {
+        user = user.copy(photoUrl = photoUrl)
+        saveData(context)
     }
 
     fun updateStreak() {
@@ -223,6 +270,7 @@ class AppViewModel : ViewModel() {
             } else break
         }
         currentStreak = streak
+        checkAchievements()
     }
 
     fun useGraceDay() {
@@ -260,6 +308,9 @@ class AppViewModel : ViewModel() {
     fun startWalk() {
         isWalking = true
         walkSeconds = 0
+        walkStartTimeMillis = System.currentTimeMillis()
+        walkStartSteps = todayActivity.steps
+        walkCurrentSteps = 0
         viewModelScope.launch {
             StepTrackerService.updateWorkout("Outdoor Walk", 0)
             while (isWalking) {
@@ -401,7 +452,6 @@ class AppViewModel : ViewModel() {
     }
 
     fun addSteps(steps: Int) {
-        // Logic handled by service mostly, but for manual/sync:
         viewModelScope.launch {
             val cur = todayActivity
             val totalSteps = cur.steps + steps
@@ -416,6 +466,7 @@ class AppViewModel : ViewModel() {
                 distanceMeters = (totalSteps * 0.76).toInt(),
                 caloriesBurned = totalCalories
             ))
+            checkAchievements()
         }
     }
 
@@ -442,9 +493,11 @@ class AppViewModel : ViewModel() {
                     caloriesBurned = session.caloriesBurned,
                     startTimeMillis = session.startTimeMillis
                 ))
+                FirebaseManager.saveWorkoutSession(session)
             }
+            checkAchievements()
         }
-        updateStreak(); checkAchievements(); saveData(context)
+        updateStreak(); saveData(context)
     }
 
     fun deleteSession(session: WorkoutSession) {
@@ -462,28 +515,39 @@ class AppViewModel : ViewModel() {
 
     private fun checkAchievements() {
         val act = todayActivity
+        val nowHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        
         if (act.steps >= 10000) unlockAchievement("a3")
         if (currentStreak >= 7) unlockAchievement("a4")
         if (waterIntake.intValue >= waterTarget) unlockAchievement("a7")
+        if (sessions.isNotEmpty()) unlockAchievement("a1")
+        if (sessions.size >= 10) unlockAchievement("a5")
         
-        // New milestones
-        if (sessions.isNotEmpty()) unlockAchievement("a1") // First Workout
-        if (sessions.size >= 10) unlockAchievement("a5") // Strong Start
-        
-        // Tried all categories check
         val completedCategories = sessions.mapNotNull { s -> SampleData.workouts.find { it.id == s.workoutId }?.category }.toSet()
-        if (completedCategories.size >= 5) { // Cardio, Strength, Yoga, HIIT, Stretching
-             unlockAchievement("a8")
-        }
+        if (completedCategories.size >= 5) unlockAchievement("a8")
 
         val totalSteps = activityHistory.sumOf { it.steps }
-        if (totalSteps >= 100000) unlockAchievement("a6") // Century
+        if (totalSteps >= 100000) unlockAchievement("a6")
+
+        // a9: Early Bird (before 8 AM)
+        if (nowHour < 8 && sessions.any { it.dateEpochDay == today }) unlockAchievement("a9")
+        
+        // a10: Night Owl (after 10 PM)
+        if (nowHour >= 22 && (act.steps > 0 || sessions.any { it.dateEpochDay == today })) unlockAchievement("a10")
+        
+        // a11: Steady Progress (3 days in a row)
+        if (currentStreak >= 3) unlockAchievement("a11")
+        
+        // a12: Mountain Climber (500 workout minutes)
+        val totalMins = activityHistory.sumOf { it.workoutMinutes }
+        if (totalMins >= 500) unlockAchievement("a12")
     }
 
     private fun unlockAchievement(id: String) {
         val idx = achievements.indexOfFirst { it.id == id }
         if (idx >= 0 && !achievements[idx].unlocked) {
             achievements[idx] = achievements[idx].copy(unlocked = true)
+            playAchievementSound()
             notificationSystem.notifyAchievement(achievements[idx].title)
         }
     }
@@ -497,6 +561,33 @@ class AppViewModel : ViewModel() {
         themeMode = mode; saveData(context)
     }
 
+    fun logout(context: Context) {
+        FirebaseManager.logout()
+        onboardingComplete = false
+        user = User()
+        saveData(context)
+    }
+
+    fun syncFromFirebase(context: Context) {
+        if (!FirebaseManager.isUserLoggedIn()) return
+        viewModelScope.launch {
+            val remoteUser = FirebaseManager.fetchUser()
+            if (remoteUser != null) {
+                user = remoteUser
+                onboardingComplete = true
+                saveData(context)
+            }
+        }
+    }
+
+    fun syncWithFirebase() {
+        if (!FirebaseManager.isUserLoggedIn()) return
+        viewModelScope.launch {
+            FirebaseManager.saveUser(user)
+            FirebaseManager.syncActivity(todayActivity)
+        }
+    }
+
     fun setProfilePic(context: Context, index: Int) {
         profilePicIndex = index; saveData(context)
     }
@@ -506,9 +597,23 @@ class AppViewModel : ViewModel() {
         return (0..6).map { activityFor(t - (6 - it)) }
     }
 
-    fun monthActivities(): List<DailyActivity> {
-        val t = today
-        return (0..29).map { activityFor(t - (29 - it)) }
+    fun last12MonthsActivities(): List<Pair<String, Float>> {
+        val now = java.time.LocalDate.now()
+        val result = mutableListOf<Pair<String, Float>>()
+        for (i in 11 downTo 0) {
+            val monthDate = now.minusMonths(i.toLong())
+            val month = monthDate.monthValue
+            val year = monthDate.year
+            val monthLabel = monthDate.month.name.take(3)
+            
+            val totalSteps = activityHistory.filter { 
+                val d = java.time.LocalDate.ofEpochDay(it.epochDay)
+                d.monthValue == month && d.year == year
+            }.sumOf { it.steps }.toFloat()
+            
+            result.add(monthLabel to totalSteps)
+        }
+        return result
     }
 
     fun dayHourlyActivity(): List<Int> {
@@ -517,18 +622,14 @@ class AppViewModel : ViewModel() {
         
         runBlocking {
             try {
-                // Steps contribution
                 val events = db.activityDao().getStepEventsForDay(t)
                 events.forEach { ts ->
                     val hour = java.time.Instant.ofEpochMilli(ts)
                         .atZone(java.time.ZoneId.systemDefault())
                         .hour
-                    if (hour in 0..23) {
-                        hourly[hour] += 1 // One "unit" for a step event
-                    }
+                    if (hour in 0..23) hourly[hour] += 1
                 }
                 
-                // Workout contribution
                 val todaySessions = sessions.filter { it.dateEpochDay == t }
                 todaySessions.forEach { session ->
                     val startHour = java.time.Instant.ofEpochMilli(session.startTimeMillis)
@@ -537,8 +638,6 @@ class AppViewModel : ViewModel() {
                     val durationHours = (session.durationActualMin / 60) + 1
                     for (i in 0 until durationHours) {
                         val h = (startHour + i) % 24
-                        // Give workouts a higher "activity weight"
-                        // 1 min of workout ≈ 20 activity units (comparable to ~20 steps of intensity)
                         hourly[h] += (session.durationActualMin * 2) / durationHours 
                     }
                 }
@@ -546,15 +645,6 @@ class AppViewModel : ViewModel() {
                 Log.e("AppViewModel", "Error fetching hourly activity", e)
             }
         }
-        
-        // Fallback simulation if no real events yet but we have steps
-        if (hourly.sum() == 0 && todayActivity.steps > 0) {
-            val total = todayActivity.steps
-            val profile = listOf(0,0,0,0,0,0,1,2,5,8,10,12,15,12,10,8,12,15,10,8,5,2,1,0)
-            val sum = profile.sum()
-            return profile.map { (it.toFloat() / sum * total).toInt() }
-        }
-        
         return hourly
     }
 
@@ -567,11 +657,8 @@ class AppViewModel : ViewModel() {
             val start = user.planStartDateEpoch ?: return null
             val dayOfPlan = (today - start + 1).toInt()
             if (dayOfPlan < 1 || dayOfPlan > plan.durationDays) return null
-            
-            // Loop schedule if it's shorter than duration, or use modulo for 28-day plans
             val scheduleDay = if (plan.schedule.containsKey(dayOfPlan)) dayOfPlan 
                             else ((dayOfPlan - 1) % 7) + 1
-            
             val workoutId = plan.schedule[scheduleDay] ?: return null
             return SampleData.workouts.find { it.id == workoutId }
         }
@@ -589,6 +676,15 @@ class AppViewModel : ViewModel() {
     fun toggleAutoCooldown(context: Context, enabled: Boolean) {
         user = user.copy(autoCooldown = enabled)
         saveData(context)
+    }
+
+    fun requestIgnoreBatteryOptimizations(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = android.net.Uri.parse("package:${context.packageName}")
+            }
+            context.startActivity(intent)
+        }
     }
 
     fun weeklyStepTotal() = weekActivities().sumOf { it.steps }
