@@ -18,10 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.stepstack.app.data.*
 import com.stepstack.app.ui.components.*
 import com.stepstack.app.ui.theme.*
@@ -108,6 +110,19 @@ fun HomeScreen(
 
             // Welcome Header
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (vm.user.photoUrl.isNotEmpty()) {
+                    AsyncImage(
+                        model = vm.user.photoUrl,
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .border(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(Modifier.width(12.dp))
+                }
+
                 Column(Modifier.weight(1f)) {
                     Text(
                         if (isWelcomeBack) "Welcome back, ${vm.user.name.ifBlank { "Athlete" }}!" else greeting(vm.user.name),
@@ -442,7 +457,16 @@ fun HomeScreen(
                     ChartViewType.DAY -> {
                         val hourly = vm.dayHourlyActivity()
                         val vals = hourly.map { it.toFloat() }
-                        val lbls = List(24) { i -> if (i % 4 == 0) "${if (i==0) 12 else if (i>12) i-12 else i}${if (i>=12) "p" else "a"}" else "" }
+                        val lbls = List(24) { i -> 
+                            when {
+                                i == 0 -> "12a"
+                                i == 6 -> "6a"
+                                i == 12 -> "12p"
+                                i == 18 -> "6p"
+                                i == 23 -> "11p"
+                                else -> ""
+                            }
+                        }
                         vals to lbls
                     }
                     ChartViewType.WEEK -> {
@@ -458,15 +482,9 @@ fun HomeScreen(
                         vals to lbls
                     }
                     ChartViewType.MONTH -> {
-                        val history = vm.monthActivities()
-                        val vals = history.map { 
-                            when(dataType) {
-                                "Score" -> it.movementScore.toFloat()
-                                "Steps" -> it.steps.toFloat()
-                                else -> it.caloriesBurned.toFloat()
-                            }
-                        }
-                        val lbls = List(history.size) { i -> if (i % 7 == 0) "${i+1}" else "" }
+                        val data = vm.last12MonthsActivities()
+                        val vals = data.map { it.second }
+                        val lbls = data.map { it.first }
                         vals to lbls
                     }
                 }
@@ -484,19 +502,6 @@ fun HomeScreen(
                     else -> null
                 }
             )
-
-            Spacer(Modifier.height(24.dp))
-            SectionHeaderRow("Suggested for Today")
-            suggested?.let {
-                val isFav = favoriteIds.contains(it.id)
-                WorkoutSessionCard(
-                    workout = it, 
-                    showFavorite = true, 
-                    isFavorite = isFav, 
-                    onClick = { onOpenWorkout(it) },
-                    onFavoriteClick = { onToggleFavorite(it.id) }
-                )
-            }
 
             Spacer(Modifier.height(24.dp))
 

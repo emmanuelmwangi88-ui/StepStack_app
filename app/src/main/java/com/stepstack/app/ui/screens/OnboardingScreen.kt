@@ -1,6 +1,7 @@
 package com.stepstack.app.ui.screens
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,12 +20,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.Insights
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +35,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
 import com.stepstack.app.data.ActivityLevel
 import com.stepstack.app.data.Equipment
 import com.stepstack.app.data.GoalType
@@ -45,12 +43,16 @@ import com.stepstack.app.data.OnboardingDraft
 import com.stepstack.app.ui.theme.Teal600
 import com.stepstack.app.R
 import com.stepstack.app.ui.theme.Lime500
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import com.stepstack.app.ui.theme.StepStackTheme
 
 @Composable
-fun OnboardingScreen(onComplete: (OnboardingDraft) -> Unit) {
+fun OnboardingScreen(onComplete: (OnboardingDraft) -> Unit, onBackToAuth: () -> Unit) {
     var step by remember { mutableStateOf(0) }
     var draft by remember { mutableStateOf(OnboardingDraft()) }
     val totalSteps = 7
@@ -65,7 +67,7 @@ fun OnboardingScreen(onComplete: (OnboardingDraft) -> Unit) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (step > 0) {
+            if (step > 0 && step < 6) {
                 LinearProgressIndicator(
                     progress = { step.toFloat() / (totalSteps - 1) },
                     modifier = Modifier
@@ -93,7 +95,7 @@ fun OnboardingScreen(onComplete: (OnboardingDraft) -> Unit) {
                     3 -> EquipmentStep(draft.equipment) { draft = draft.copy(equipment = it); step = 4 }
                     4 -> BiometricsStep(draft.weight, draft.height) { w, h -> draft = draft.copy(weight = w, height = h); step = 5 }
                     5 -> PermissionsStep(onNext = { step = 6 })
-                    6 -> AccountStep(draft) { name, email ->
+                    6 -> CreateAccountStep(draft, onBack = onBackToAuth) { name, email ->
                         onComplete(draft.copy(name = name, email = email))
                     }
                 }
@@ -359,49 +361,146 @@ private fun PermissionCard(icon: androidx.compose.ui.graphics.vector.ImageVector
 }
 
 @Composable
-private fun AccountStep(draft: OnboardingDraft, onDone: (String, String) -> Unit) {
+private fun CreateAccountStep(draft: OnboardingDraft, onBack: () -> Unit, onDone: (String, String) -> Unit) {
     var name by remember { mutableStateOf(draft.name) }
     var email by remember { mutableStateOf(draft.email) }
+    var password by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var passwordVisible by remember { mutableStateOf(false) }
     
-    StepScaffold("Almost there", "Tell us a bit about yourself.") {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Your Name") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            )
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text("Email Address") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            )
-            Spacer(Modifier.height(8.dp))
-            PrimaryButton("Complete Account Setup") { onDone(name, email) }
-            TextButton(
-                onClick = { onDone(name, email) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Skip to demo", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val scope = rememberCoroutineScope()
+    val auth = FirebaseAuth.getInstance()
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.Start) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
             }
-            
+        }
+
+        Spacer(Modifier.height(24.dp))
+        
+        Text(
+            "Create Your Account",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            "Last step! Let's secure your fitness data and start your journey.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        
+        Spacer(Modifier.height(40.dp))
+
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Full Name") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            leadingIcon = { Icon(Icons.Default.Person, null) },
+            singleLine = true
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it; errorMessage = null },
+            label = { Text("Email Address") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            leadingIcon = { Icon(Icons.Default.Email, null) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            singleLine = true
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it; errorMessage = null },
+            label = { Text("Password") },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            leadingIcon = { Icon(Icons.Default.Lock, null) },
+            trailingIcon = {
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, null)
+                }
+            },
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            singleLine = true
+        )
+        
+        AnimatedVisibility(visible = errorMessage != null) {
             Text(
-                "By continuing, you agree to our Terms of Service.",
+                text = errorMessage ?: "",
+                color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
+        
+        Spacer(Modifier.height(40.dp))
+        
+        Button(
+            onClick = {
+                if (name.isBlank() || email.isBlank() || password.isBlank()) {
+                    errorMessage = "Please fill in all fields"
+                    return@Button
+                }
+                isLoading = true
+                scope.launch {
+                    try {
+                        auth.createUserWithEmailAndPassword(email, password).await()
+                        onDone(name, email)
+                    } catch (e: Exception) {
+                        errorMessage = e.localizedMessage ?: "Registration failed"
+                    } finally {
+                        isLoading = false
+                    }
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            enabled = !isLoading,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+            } else {
+                Text("Join Step Stack", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+        
+        Spacer(Modifier.height(24.dp))
+        
+        Text(
+            "By continuing, you agree to our Terms of Service and Privacy Policy.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        
+        Spacer(Modifier.height(32.dp))
     }
 }
 
@@ -425,6 +524,6 @@ fun PrimaryButton(text: String, onClick: () -> Unit) {
 @Composable
 fun PreviewOnboardingScreen() {
     StepStackTheme {
-        OnboardingScreen(onComplete = {})
+        OnboardingScreen(onComplete = {}, onBackToAuth = {})
     }
 }

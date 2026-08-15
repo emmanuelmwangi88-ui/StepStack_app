@@ -47,15 +47,18 @@ class StepCounterManager(context: Context) : SensorEventListener {
     var onStepUpdate: ((Int) -> Unit)? = null      // Source of truth (today's total)
     var onStepDetected: (() -> Unit)? = null       // Instant event (one step)
 
+    private var lastEmittedSteps: Int = 0
+
     fun startTracking() {
         if (!isStepCounterAvailable) {
             Log.e("StepCounterManager", "Hardware Step Counter not available.")
-            return
+            // Fallback to detector if counter is missing? 
+            // Most modern phones have both, but we should register detector anyway.
         }
 
         // Counter sensor for accuracy (Source of Truth)
         stepCounterSensor?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
         
         // Detector sensor for real-time responsiveness
@@ -79,6 +82,17 @@ class StepCounterManager(context: Context) : SensorEventListener {
             Sensor.TYPE_STEP_DETECTOR -> {
                 if (event.values[0] == 1.0f) {
                     onStepDetected?.invoke()
+                    // Fused logic: increment live count if detector fires
+                    // and it's higher than the last batched counter update
+                    val currentLive = lastKnownRawValue - baselineSteps
+                    if (currentLive >= 0) {
+                        val predicted = currentLive + 1
+                        // We only emit if we haven't already emitted this value from the counter
+                        if (predicted > lastEmittedSteps) {
+                            lastEmittedSteps = predicted
+                            onStepUpdate?.invoke(predicted)
+                        }
+                    }
                 }
             }
         }
@@ -86,43 +100,25 @@ class StepCounterManager(context: Context) : SensorEventListener {
 
     private fun handleCounterEvent(currentRawValue: Int) {
         // REBOOT DETECTION
-        // If currentRawValue < lastKnownRawValue, the device rebooted.
-        // We must update the baseline to prevent negative steps.
         if (currentRawValue < lastKnownRawValue && lastKnownRawValue != -1) {
             Log.i("StepCounterManager", "Device reboot detected. Adjusting baseline.")
-            // On reboot, the raw counter starts from 0 again.
-            // We adjust the baseline by the distance it jumped backwards.
-            // Specifically, if we had baseline 1000 and lastRaw 1500 (500 steps today),
-            // and now raw is 10, we want today's steps to still be 500+10.
-            // Simplified: we treat the previous steps as "baked into" a virtual offset.
-            // However, the user requirement says: "treat this by setting a new baseline of 0 
-            // and log/flag that a reboot occurred so historical data isn't corrupted."
-            // This implies we reset the counting for the "today" portion of the sensor.
-            
-            // To be robust: if raw < baseline, it definitely rebooted.
-            if (currentRawValue < baselineSteps) {
-                 // Reset baseline to current to start counting from 0 today again?
-                 // No, we should ideally preserve today's progress.
-                 // But following user instruction: "setting a new baseline of 0" 
-                 // usually means baseline = currentRawValue - currentTodaySteps (if we want to keep them).
-                 // User says: "todaySteps = currentSensorValue - baselineStepsAtDayStart".
-                 // If we set baselineStepsAtDayStart = 0 on reboot, todaySteps = currentSensorValue.
-                 // This assumes we add the previous progress manually or just accept the loss if not tracked.
-                 // Actually, a better reboot handling is:
-                 baselineSteps = 0 
-            }
+            val todayStepsBeforeReboot = (lastKnownRawValue - baselineSteps).coerceAtLeast(0)
+            baselineSteps = currentRawValue - todayStepsBeforeReboot
         }
         
         lastKnownRawValue = currentRawValue
 
         if (baselineSteps == -1) {
-            // First time ever or forced reset
             baselineSteps = currentRawValue
         }
 
-        val todaySteps = currentRawValue - baselineSteps
-        // Ensure non-negative in case of weirdness
-        onStepUpdate?.invoke(if (todaySteps < 0) 0 else todaySteps)
+        val todaySteps = (currentRawValue - baselineSteps).coerceAtLeast(0)
+        
+        // Update lastEmittedSteps so detector doesn't double count
+        if (todaySteps >= lastEmittedSteps) {
+            lastEmittedSteps = todaySteps
+            onStepUpdate?.invoke(todaySteps)
+        }
     }
 
     /**

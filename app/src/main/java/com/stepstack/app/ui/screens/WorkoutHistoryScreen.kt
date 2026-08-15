@@ -81,9 +81,10 @@ fun WorkoutHistoryScreen(vm: AppViewModel, onBack: () -> Unit) {
                     Column(Modifier.padding(20.dp)) {
                         Text("Minutes Exercised", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(Modifier.height(16.dp))
+                        val week = vm.weekActivities()
                         BarChart(
-                            values = vm.weekActivities().map { it.workoutMinutes.toFloat() },
-                            labels = listOf("M", "T", "W", "T", "F", "S", "S"),
+                            values = week.map { it.workoutMinutes.toFloat() },
+                            labels = week.map { LocalDate.ofEpochDay(it.epochDay).dayOfWeek.name.take(1) },
                             barColor = MaterialTheme.colorScheme.primary
                         )
                     }

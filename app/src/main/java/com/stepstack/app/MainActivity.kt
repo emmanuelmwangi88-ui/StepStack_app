@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material.icons.Icons
@@ -23,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
@@ -39,11 +41,13 @@ import com.stepstack.app.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    private val vm: AppViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            val vm: AppViewModel = viewModel()
             val darkTheme = when (vm.themeMode) {
                 "Dark" -> true
                 "Light" -> false
@@ -57,6 +61,17 @@ class MainActivity : ComponentActivity() {
                 
                 CompositionLocalProvider(LocalWorkoutAudioManager provides audioManager) {
                     val context = LocalContext.current
+                    var isLoggedIn by remember { mutableStateOf(com.stepstack.app.data.FirebaseManager.isUserLoggedIn()) }
+
+                    DisposableEffect(Unit) {
+                        val authListener = com.google.firebase.auth.FirebaseAuth.AuthStateListener { auth ->
+                            isLoggedIn = auth.currentUser != null
+                        }
+                        com.google.firebase.auth.FirebaseAuth.getInstance().addAuthStateListener(authListener)
+                        onDispose {
+                            com.google.firebase.auth.FirebaseAuth.getInstance().removeAuthStateListener(authListener)
+                        }
+                    }
 
                     val launcher = rememberLauncherForActivityResult(
                         ActivityResultContracts.RequestMultiplePermissions()
@@ -77,6 +92,11 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) {
                         vm.loadData(context)
                         
+                        val pm = context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+                        vm.isBatteryOptimizationIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            pm.isIgnoringBatteryOptimizations(context.packageName)
+                        } else true
+
                         val needsActivity = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                             ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED
                         } else false
@@ -106,17 +126,45 @@ class MainActivity : ComponentActivity() {
                     }
 
                     var showSplash by remember { mutableStateOf(true) }
+                    var isOnboarding by remember { mutableStateOf(false) }
 
                     if (showSplash) {
                         com.stepstack.app.ui.screens.SplashScreen { showSplash = false }
+                    } else if (!isLoggedIn) {
+                        if (isOnboarding) {
+                            OnboardingScreen(
+                                onComplete = { 
+                                    vm.completeOnboarding(context, it)
+                                    isOnboarding = false
+                                },
+                                onBackToAuth = { isOnboarding = false }
+                            )
+                        } else {
+                            com.stepstack.app.ui.screens.AuthScreen(
+                                onAuthSuccess = { vm.syncFromFirebase(context) },
+                                onNavigateToOnboarding = { isOnboarding = true }
+                            )
+                        }
                     } else if (!vm.onboardingComplete) {
-                        OnboardingScreen(onComplete = { vm.completeOnboarding(context, it) })
+                        // User is logged in but hasn't finished profile data
+                        OnboardingScreen(
+                            onComplete = { vm.completeOnboarding(context, it) },
+                            onBackToAuth = { /* Should maybe logout or just stay */ }
+                        )
                     } else {
                         MainApp(vm)
                     }
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val pm = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+        vm.isBatteryOptimizationIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            pm.isIgnoringBatteryOptimizations(packageName)
+        } else true
     }
 }
 
@@ -202,6 +250,7 @@ fun MainApp(vm: AppViewModel) {
             WalkTimerSheet(
                 isWalking = vm.isWalking,
                 seconds = vm.walkSeconds,
+                steps = vm.walkCurrentSteps,
                 onStart = { vm.startWalk() },
                 onStop = { 
                     vm.stopWalk()
@@ -212,7 +261,8 @@ fun MainApp(vm: AppViewModel) {
                             workoutName = "Outdoor Walk",
                             dateEpochDay = vm.today,
                             durationActualMin = mins,
-                            completedPercent = 100
+                            completedPercent = 100,
+                            startTimeMillis = vm.walkStartTimeMillis
                         ))
                     }
                     showWalkTimer = false
@@ -266,7 +316,7 @@ fun BottomNav(navController: NavHostController) {
                 onClick = {
                     if (currentRoute != tab.route) {
                         navController.navigate(tab.route) {
-                            popUpTo(Route.Home.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
                                 saveState = true
                             }
                             launchSingleTop = true

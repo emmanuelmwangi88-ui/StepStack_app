@@ -165,30 +165,6 @@ fun WorkoutsScreen(
                 }
             }
 
-            // Suggested
-            if (!favoritesOnly) {
-                item {
-                    WorkoutSectionHeader("Suggested for Today")
-                    val suggested = allWorkouts.firstOrNull { it.difficulty == selectedDifficulty } ?: allWorkouts.firstOrNull()
-                    suggested?.let {
-                        WorkoutSessionCard(
-                            workout = it,
-                            isFavorite = favorites.contains(it.id),
-                            onClick = { onOpenWorkout(it) },
-                            onFavoriteClick = { viewModel.toggleFavorite(it.id) },
-                            modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth()
-                        )
-                    }
-                    Spacer(Modifier.height(24.dp))
-                }
-            } else if (filtered.isEmpty()) {
-                item {
-                    EmptyWorkoutsState(isFavorites = true) {
-                        viewModel.toggleFavoritesOnly()
-                    }
-                }
-            }
-
             // Rows by Category
             WorkoutCategory.entries.forEach { cat ->
                 val inCat = filtered.filter { it.category == cat }

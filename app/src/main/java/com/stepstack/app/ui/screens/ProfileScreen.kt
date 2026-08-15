@@ -1,6 +1,10 @@
 package com.stepstack.app.ui.screens
 
 import android.app.TimePickerDialog
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,14 +25,17 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.stepstack.app.data.*
 import com.stepstack.app.ui.components.*
 import com.stepstack.app.ui.theme.*
+import com.stepstack.app.util.CloudinaryManager
 import com.stepstack.app.viewmodel.AppViewModel
 
 import androidx.compose.ui.tooling.preview.Preview
@@ -50,14 +57,35 @@ fun ProfileScreen(
     padding: PaddingValues = PaddingValues(0.dp)
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var isEditingName by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf(vm.user.name) }
+    var isUploading by remember { mutableStateOf(false) }
     
     var showGoalDialog by remember { mutableStateOf(false) }
     var showStepGoalDialog by remember { mutableStateOf(false) }
     var showActivityDialog by remember { mutableStateOf(false) }
     var showEquipmentDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri ->
+            uri?.let {
+                isUploading = true
+                CloudinaryManager.uploadImage(
+                    it,
+                    onSuccess = { url ->
+                        vm.updateProfilePhoto(context, url)
+                        isUploading = false
+                    },
+                    onError = { error ->
+                        isUploading = false
+                    }
+                )
+            }
+        }
+    )
 
     val timePickerDialog = TimePickerDialog(
         context,
@@ -77,7 +105,6 @@ fun ProfileScreen(
     ) {
         Spacer(Modifier.height(12.dp))
         
-        // --- Profile Header ---
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
@@ -90,11 +117,26 @@ fun ProfileScreen(
                         .size(64.dp)
                         .clip(CircleShape)
                         .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, Lime500)))
-                        .clickable { vm.setProfilePic(context, (vm.profilePicIndex + 1) % 5) },
+                        .clickable { 
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
-                    val icons = listOf(Icons.Default.Person, Icons.Default.DirectionsRun, Icons.Default.EmojiEvents, Icons.Default.Insights, Icons.Default.FitnessCenter)
-                    Icon(icons[vm.profilePicIndex % icons.size], null, tint = Color.White, modifier = Modifier.size(28.dp))
+                    if (isUploading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else if (vm.user.photoUrl.isNotEmpty()) {
+                        AsyncImage(
+                            model = vm.user.photoUrl,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        val icons = listOf(Icons.Default.Person, Icons.Default.DirectionsRun, Icons.Default.EmojiEvents, Icons.Default.Insights, Icons.Default.FitnessCenter)
+                        Icon(icons[vm.profilePicIndex % icons.size], null, tint = Color.White, modifier = Modifier.size(28.dp))
+                    }
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -138,7 +180,6 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // --- Workout Settings Group ---
         SettingsGroup("Your Plan") {
             SettingsItem(
                 icon = Icons.Default.DirectionsWalk,
@@ -180,34 +221,6 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // --- Weekly Performance Group ---
-        SettingsGroup("Weekly Performance") {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AutoGraph, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Weekly Insight", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text("Keep it up!", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "You've met your movement goal ${vm.weekActivities().count { it.movementScore >= vm.baseTarget }} days this week. You're ${vm.weekActivities().count { it.movementScore >= vm.baseTarget }}/7 towards a perfect week!",
-                        color = Color.White.copy(alpha = 0.9f),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // --- Preferences Group ---
         SettingsGroup("Preferences") {
             SettingsItem(
                 icon = Icons.Default.Palette,
@@ -242,13 +255,11 @@ fun ProfileScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // --- Biometrics Card ---
         SectionHeader("Biometrics")
         BodyStatCard(vm)
 
         Spacer(Modifier.height(16.dp))
 
-        // --- Achievements Lazy Row ---
         SectionHeader("Achievements")
         LazyRow(
             contentPadding = PaddingValues(bottom = 12.dp),
@@ -260,9 +271,21 @@ fun ProfileScreen(
         }
 
         Spacer(Modifier.height(24.dp))
+        
+        Button(
+            onClick = { vm.logout(context) },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.error),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Icon(Icons.Default.Logout, null)
+            Spacer(Modifier.width(8.dp))
+            Text("Logout", fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(Modifier.height(32.dp))
     }
 
-    // --- Dialogs ---
     if (showGoalDialog) {
         OptionSelectionDialog("Fitness Goal", GoalType.entries.map { it.label }, {
             vm.updateProfile(context, vm.user.name, GoalType.entries.find { g -> g.label == it }!!, vm.user.activityLevel, vm.user.equipment)
@@ -292,16 +315,6 @@ fun ProfileScreen(
             vm.setThemeMode(context, it)
             showThemeDialog = false
         }, { showThemeDialog = false })
-    }
-}
-
-@Composable
-private fun PRItem(label: String, value: String, icon: ImageVector) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(12.dp))
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -402,118 +415,6 @@ private fun BodyStatCard(vm: AppViewModel) {
                     }) { Icon(Icons.Default.Save, null, tint = MaterialTheme.colorScheme.primary) }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun AchievementBadge(a: Achievement) {
-    val unlockedColor = when(a.id) {
-        "a1" -> Color(0xFF4FC3F7) // Light Blue
-        "a2" -> Color(0xFF81C784) // Green
-        "a3" -> Color(0xFFFFB74D) // Orange
-        "a4" -> Color(0xFFE57373) // Red
-        "a5" -> Color(0xFF9575CD) // Purple
-        "a6" -> Color(0xFFFFD54F) // Gold
-        "a7" -> Color(0xFF4DB6AC) // Teal
-        "a8" -> Color(0xFFBA68C8) // Violet
-        else -> Coral500
-    }
-    
-    val color = if (a.unlocked) unlockedColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-    
-    Card(
-        modifier = Modifier.width(140.dp).height(180.dp),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (a.unlocked) Color.White else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        ),
-        elevation = if (a.unlocked) CardDefaults.cardElevation(defaultElevation = 4.dp) else CardDefaults.cardElevation(0.dp),
-        border = if (a.unlocked) androidx.compose.foundation.BorderStroke(2.dp, Brush.linearGradient(listOf(unlockedColor, unlockedColor.copy(alpha = 0.5f)))) else null
-    ) {
-        Column(
-            Modifier.padding(12.dp).fillMaxSize(), 
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(80.dp)) {
-                if (a.unlocked) {
-                    // Animated-like glow
-                    Surface(
-                        Modifier.size(64.dp).scale(1.3f),
-                        shape = CircleShape,
-                        color = unlockedColor.copy(alpha = 0.15f)
-                    ) {}
-                    Surface(
-                        Modifier.size(50.dp).scale(1.1f),
-                        shape = CircleShape,
-                        color = unlockedColor.copy(alpha = 0.1f)
-                    ) {}
-                }
-                
-                Surface(
-                    Modifier.size(56.dp), 
-                    shape = CircleShape, 
-                    color = if (a.unlocked) unlockedColor.copy(alpha = 0.1f) else Color.Transparent,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = when(a.icon) {
-                                "footprint" -> Icons.Default.DirectionsWalk
-                                "calendar" -> Icons.Default.CalendarToday
-                                "steps" -> Icons.Default.DirectionsRun
-                                "flame" -> Icons.Default.Whatshot
-                                "dumbbell" -> Icons.Default.FitnessCenter
-                                "trophy" -> Icons.Default.EmojiEvents
-                                "explore" -> Icons.Default.Explore
-                                "water_drop" -> Icons.Default.Opacity
-                                else -> Icons.Default.EmojiEvents
-                            },
-                            contentDescription = null,
-                            tint = color,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                }
-                
-                if (!a.unlocked) {
-                    Box(
-                        Modifier
-                            .size(24.dp)
-                            .align(Alignment.BottomEnd)
-                            .background(MaterialTheme.colorScheme.surface, CircleShape)
-                            .padding(4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Lock, 
-                            null, 
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                }
-            }
-            
-            Spacer(Modifier.height(8.dp))
-            Text(
-                a.title, 
-                style = MaterialTheme.typography.labelLarge, 
-                fontWeight = FontWeight.Black, 
-                maxLines = 1, 
-                textAlign = TextAlign.Center,
-                color = if (a.unlocked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                a.description, 
-                style = MaterialTheme.typography.bodySmall, 
-                color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                maxLines = 2, 
-                textAlign = TextAlign.Center, 
-                lineHeight = 13.sp,
-                fontSize = 10.sp
-            )
         }
     }
 }

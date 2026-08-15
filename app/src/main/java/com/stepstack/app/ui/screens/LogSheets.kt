@@ -70,6 +70,7 @@ fun LogOutdoorSheet(onLog: (Int, String) -> Unit) {
 fun WalkTimerSheet(
     isWalking: Boolean,
     seconds: Int,
+    steps: Int,
     onStart: () -> Unit,
     onStop: () -> Unit
 ) {
@@ -88,6 +89,16 @@ fun WalkTimerSheet(
             fontWeight = FontWeight.Black,
             color = MaterialTheme.colorScheme.primary
         )
+
+        if (isWalking || seconds > 0) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "%,d steps taken".format(steps),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         
         Spacer(Modifier.height(48.dp))
         
