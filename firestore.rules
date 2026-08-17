@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // User Profiles
+    match /users/{userId} {
+      allow read: if request.auth != null; // Everyone can read profiles to search/view friends
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Friendships
+    match /friendships/{friendshipId} {
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || resource.data.friendId == request.auth.uid);
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && (resource.data.userId == request.auth.uid || resource.data.friendId == request.auth.uid);
+    }
+
+    // Daily Steps
+    match /dailySteps/{stepId} {
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid ||
+        exists(/databases/$(database)/documents/friendships/$(request.auth.uid + "_" + resource.data.userId)) ||
+        exists(/databases/$(database)/documents/friendships/$(resource.data.userId + "_" + request.auth.uid))
+      );
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Challenges
+    match /challenges/{challengeId} {
+      allow read: if request.auth != null && (
+        exists(/databases/$(database)/documents/challenges/$(challengeId)/participants/$(request.auth.uid))
+      );
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.createdBy == request.auth.uid;
+
+      // Participants Subcollection
+      match /participants/{participantId} {
+        allow read: if request.auth != null && (
+          exists(/databases/$(database)/documents/challenges/$(challengeId)/participants/$(request.auth.uid))
+        );
+        allow write: if request.auth != null && (
+          request.auth.uid == participantId || // Can update own status
+          get(/databases/$(database)/documents/challenges/$(challengeId)).data.createdBy == request.auth.uid // Creator can manage
+        );
+      }
+    }
+  }
+}
