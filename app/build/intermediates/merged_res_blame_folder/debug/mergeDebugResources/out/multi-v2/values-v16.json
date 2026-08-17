@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.stepstack.app-mergeDebugResources-91:/values-v16/values-v16.xml",
+            "outputFile": "com.stepstack.app-mergeDebugResources-93:/values-v16/values-v16.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\user\\.gradle\\caches\\8.11.1\\transforms\\0bbfeb09669e062b1aa52b7a40e74b82\\transformed\\appcompat-1.7.0\\res\\values-v16\\values-v16.xml",
+                    "source": "C:\\Users\\user\\.gradle\\caches\\8.13\\transforms\\078b45afea63be2460268b169fa82007\\transformed\\appcompat-1.7.0\\res\\values-v16\\values-v16.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",

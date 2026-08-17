@@ -5,6 +5,13 @@ sealed class Route(val route: String) {
     data object Workouts : Route("workouts")
     data object Steps : Route("steps")
     data object Profile : Route("profile")
+    data object Competition : Route("competition")
+    data object FriendProfile : Route("friend_profile/{uid}") {
+        fun createRoute(uid: String) = "friend_profile/$uid"
+    }
+    data object ChallengeDetail : Route("challenge_detail/{id}") {
+        fun createRoute(id: String) = "challenge_detail/$id"
+    }
     data object WorkoutDetail : Route("detail/{id}") {
         fun createRoute(id: String) = "detail/$id"
     }
@@ -17,4 +24,5 @@ sealed class Route(val route: String) {
     }
     data object History : Route("history")
     data object WorkoutComplete : Route("complete")
+    data object Notifications : Route("notifications")
 }

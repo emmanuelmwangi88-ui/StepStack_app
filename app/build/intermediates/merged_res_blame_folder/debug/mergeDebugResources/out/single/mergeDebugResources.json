@@ -1,238 +1,246 @@
 [
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxhdpi_stepstack.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxhdpi/stepstack.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_dumbbell_row.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_dumbbell_row.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxxhdpi_stepstack.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxxhdpi/stepstack.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xhdpi_ic_launcher.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xhdpi\\ic_launcher.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_yoga_cobra.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_yoga_cobra.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-mdpi_ic_launcher_round.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-mdpi\\ic_launcher_round.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_yoga_lunge.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_yoga_lunge.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxhdpi_ic_launcher_round.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxhdpi\\ic_launcher_round.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxhdpi_ic_launcher_round.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxhdpi/ic_launcher_round.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxhdpi_ic_launcher.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxhdpi\\ic_launcher.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-mdpi_stepstack.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-mdpi/stepstack.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_crunches.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_crunches.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_gym_2.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_gym_2.jpg"
+        "merged": "com.stepstack.app-debug-95:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.stepstack.app-main-97:/mipmap-anydpi-v26/ic_launcher.xml"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-anydpi-v26/ic_launcher.xml"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_deadlift.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_deadlift.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_yoga_3.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_yoga_3.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-anydpi-v26_stepstacklogo.xml.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-anydpi-v26\\stepstacklogo.xml"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xhdpi_ic_launcher_round.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xhdpi/ic_launcher_round.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xhdpi_stepstacklogo.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xhdpi\\stepstacklogo.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_fitness_class.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_fitness_class.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxhdpi_stepstacklogo.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxhdpi\\stepstacklogo.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxxhdpi_ic_launcher.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxxhdpi/ic_launcher.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_gym_2.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_gym_2.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-hdpi_stepstack.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-hdpi/stepstack.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_ic_launcher_background.xml.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\ic_launcher_background.xml"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-anydpi-v26/ic_launcher_round.xml"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xhdpi_stepstack.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xhdpi\\stepstack.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_yoga_sunset.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_yoga_sunset.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_barbell.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_barbell.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_stepstacklogo.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/stepstacklogo.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_bicep_curls.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_bicep_curls.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxhdpi_stepstacklogo_round.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxhdpi/stepstacklogo_round.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-anydpi-v26\\ic_launcher_round.xml"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-mdpi_stepstacklogo.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-mdpi/stepstacklogo.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-mdpi_ic_launcher.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-mdpi\\ic_launcher.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-hdpi_stepstacklogo.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-hdpi/stepstacklogo.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_running_prep.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_running_prep.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-hdpi_ic_launcher_round.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-hdpi/ic_launcher_round.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_yoga_sunset.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_yoga_sunset.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-hdpi_ic_launcher_foreground.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-hdpi/ic_launcher_foreground.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xhdpi_stepstacklogo_round.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xhdpi\\stepstacklogo_round.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xhdpi_stepstack.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xhdpi/stepstack.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_meditation_beach.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_meditation_beach.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxhdpi_ic_launcher_foreground.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxhdpi/ic_launcher_foreground.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_fitness_class.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_fitness_class.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-anydpi-v26_stepstacklogo_round.xml.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-anydpi-v26/stepstacklogo_round.xml"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-anydpi-v26\\ic_launcher.xml"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xhdpi_stepstacklogo.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xhdpi/stepstacklogo.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_yoga_3.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_yoga_3.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_running_2.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_running_2.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-mdpi_ic_launcher_foreground.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-mdpi\\ic_launcher_foreground.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxxhdpi_ic_launcher_foreground.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxxhdpi/ic_launcher_foreground.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_yoga_advanced.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_yoga_advanced.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_meditation_beach.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_meditation_beach.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-mdpi_stepstacklogo.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-mdpi\\stepstacklogo.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-mdpi_stepstacklogo_round.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-mdpi/stepstacklogo_round.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_stepstacklogo.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\stepstacklogo.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xhdpi_ic_launcher_foreground.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xhdpi/ic_launcher_foreground.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_yoga_silhouette.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_yoga_silhouette.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_yoga_advanced.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_yoga_advanced.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxxhdpi_stepstacklogo_round.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxxhdpi\\stepstacklogo_round.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_stepstacksplashscreen.png.flat",
-        "source": "com.stepstack.app-main-95:/drawable/stepstacksplashscreen.png"
+        "merged": "com.stepstack.app-debug-95:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.stepstack.app-main-97:/mipmap-anydpi-v26/ic_launcher_round.xml"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_running_prep.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_running_prep.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-hdpi_ic_launcher.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-hdpi\\ic_launcher.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xhdpi_ic_launcher.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xhdpi/ic_launcher.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxxhdpi_ic_launcher.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxxhdpi\\ic_launcher.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_abs_2.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_abs_2.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-hdpi_stepstacklogo.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-hdpi\\stepstacklogo.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_deadlift.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_deadlift.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_stepminilogo.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\stepminilogo.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-hdpi_stepstacklogo_round.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-hdpi/stepstacklogo_round.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_running_2.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_running_2.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxhdpi_ic_launcher.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxhdpi/ic_launcher.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_stepstacklogo_background.xml.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\stepstacklogo_background.xml"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-anydpi-v26_stepstacklogo.xml.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-anydpi-v26/stepstacklogo.xml"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxxhdpi_stepstacklogo.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxxhdpi\\stepstacklogo.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_gym_weights.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_gym_weights.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xhdpi_ic_launcher_round.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xhdpi\\ic_launcher_round.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-hdpi_ic_launcher.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-hdpi/ic_launcher.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_stepstacksplashscreen.png.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\stepstacksplashscreen.png"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_bicep_curls.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_bicep_curls.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxxhdpi_ic_launcher_round.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxxhdpi\\ic_launcher_round.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_barbell.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_barbell.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxxhdpi_stepstack.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxxhdpi\\stepstack.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_stepstacklogo_background.xml.flat",
-        "source": "com.stepstack.app-main-95:/drawable/stepstacklogo_background.xml"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxhdpi_stepstacklogo_round.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxhdpi\\stepstacklogo_round.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxxhdpi_ic_launcher_round.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxxhdpi/ic_launcher_round.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-hdpi_stepstack.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-hdpi\\stepstack.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_yoga_silhouette.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_yoga_silhouette.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-hdpi_ic_launcher_round.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-hdpi\\ic_launcher_round.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_crunches.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_crunches.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-mdpi_stepstack.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-mdpi\\stepstack.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_stepminilogo.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/stepminilogo.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxhdpi_ic_launcher_foreground.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxhdpi\\ic_launcher_foreground.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_trx_flyes.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_trx_flyes.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxhdpi_stepstack.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxhdpi\\stepstack.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_dumbbell_row.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_dumbbell_row.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_gym_weights.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_gym_weights.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxhdpi_stepstacklogo.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxhdpi/stepstacklogo.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_yoga_lunge.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_yoga_lunge.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_ic_launcher_background.xml.flat",
-        "source": "com.stepstack.app-main-95:/drawable/ic_launcher_background.xml"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_yoga_cobra.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_yoga_cobra.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/drawable_workout_abs_core.jpg.flat",
-        "source": "com.stepstack.app-main-95:/drawable/workout_abs_core.jpg"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_abs_2.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_abs_2.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxxhdpi_stepstacklogo.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxxhdpi/stepstacklogo.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xhdpi_ic_launcher_foreground.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xhdpi\\ic_launcher_foreground.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xhdpi_stepstacklogo_round.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xhdpi/stepstacklogo_round.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-mdpi_stepstacklogo_round.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-mdpi\\stepstacklogo_round.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-mdpi_ic_launcher_round.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-mdpi/ic_launcher_round.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-xxxhdpi_ic_launcher_foreground.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-xxxhdpi\\ic_launcher_foreground.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-mdpi_ic_launcher_foreground.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-mdpi/ic_launcher_foreground.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-hdpi_stepstacklogo_round.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-hdpi\\stepstacklogo_round.webp"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-mdpi_ic_launcher.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-mdpi/ic_launcher.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_trx_flyes.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_trx_flyes.jpg"
     },
     {
-        "merged": "com.stepstack.app-debug-93:/mipmap-xxxhdpi_stepstacklogo_round.webp.flat",
-        "source": "com.stepstack.app-main-95:/mipmap-xxxhdpi/stepstacklogo_round.webp"
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\drawable_workout_abs_core.jpg.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\drawable\\workout_abs_core.jpg"
+    },
+    {
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-hdpi_ic_launcher_foreground.webp.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-hdpi\\ic_launcher_foreground.webp"
+    },
+    {
+        "merged": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-debug-95:\\mipmap-anydpi-v26_stepstacklogo_round.xml.flat",
+        "source": "C:\\Users\\user\\.gradle\\daemon\\8.13\\com.stepstack.app-main-97:\\mipmap-anydpi-v26\\stepstacklogo_round.xml"
     }
 ]

@@ -1,6 +1,7 @@
 package com.stepstack.app.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,7 +48,7 @@ fun WorkoutsScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val favorites by viewModel.favoriteIds.collectAsState()
     val favoritesOnly by viewModel.showFavoritesOnly.collectAsState()
-    
+
     var selectedCategory by remember { mutableStateOf<WorkoutCategory?>(null) }
     var selectedEquipment by remember { mutableStateOf<Equipment?>(null) }
     var selectedDuration by remember { mutableStateOf<String?>(null) } // "Under 10", "10-20", "20+"
@@ -59,7 +62,7 @@ fun WorkoutsScreen(
             val matchesCategory = selectedCategory == null || workout.category == selectedCategory
             val matchesEquipment = selectedEquipment == null || workout.equipment == selectedEquipment
             val matchesFavorites = !favoritesOnly || favorites.contains(workout.id)
-            val matchesDuration = when(selectedDuration) {
+            val matchesDuration = when (selectedDuration) {
                 "Under 10" -> workout.durationMin < 10
                 "10-20" -> workout.durationMin in 10..20
                 "20+" -> workout.durationMin > 20
@@ -69,20 +72,31 @@ fun WorkoutsScreen(
         }
     }
 
+    val hasActiveFilters = selectedCategory != null || selectedEquipment != null ||
+            selectedDuration != null || selectedDifficulty != null || favoritesOnly || searchQuery.isNotEmpty()
+
+    fun clearAllFilters() {
+        selectedCategory = null
+        selectedEquipment = null
+        selectedDuration = null
+        viewModel.setSearchQuery("")
+        if (favoritesOnly) viewModel.toggleFavoritesOnly()
+    }
+
     val primary = MaterialTheme.colorScheme.primary
 
     Scaffold(
         modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()),
         floatingActionButton = {
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = onOpenBuilder,
-                containerColor = MaterialTheme.colorScheme.primary,
+                containerColor = primary,
                 contentColor = Color.White,
-                shape = CircleShape,
+                shape = RoundedCornerShape(20.dp),
+                icon = { Icon(Icons.Default.Add, "Create Routine") },
+                text = { Text("Build", fontWeight = FontWeight.Bold) },
                 modifier = Modifier.padding(bottom = 1.dp, end = 1.dp)
-            ) {
-                Icon(Icons.Default.Add, "Create Routine", modifier = Modifier.size(28.dp))
-            }
+            )
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
@@ -96,57 +110,58 @@ fun WorkoutsScreen(
             // Header
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(22.dp, 16.dp, 24.dp, 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(primary.copy(alpha = 0.14f), Color.Transparent),
+                                start = Offset(0f, 0f),
+                                end = Offset(0f, 260f)
+                            )
+                        )
+                        .padding(22.dp, 20.dp, 24.dp, 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text("Workouts", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
-                        Text("Find your perfect flow \u2728", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Find your perfect flow \u2728",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     Surface(
-                        color = primary.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(12.dp),
-                        onClick = { /* Open Level progress */ }
+                        color = primary.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(16.dp),
+                        onClick = { viewModel.toggleFavoritesOnly() }
                     ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Favorite,
+                                contentDescription = "Saved workouts",
+                                tint = primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                "${favorites.size}",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = primary
+                            )
+                        }
                     }
                 }
             }
 
             // Filters
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 16.dp)) {
-                    // Search & Favorites Toggle
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { viewModel.setSearchQuery(it) },
-                            placeholder = { Text("Search...") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(16.dp),
-                            leadingIcon = { Icon(Icons.Default.Search, null) },
-                            singleLine = true
-                        )
-                        
-                        FilledIconToggleButton(
-                            checked = favoritesOnly,
-                            onCheckedChange = { viewModel.toggleFavoritesOnly() },
-                            modifier = Modifier.size(56.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = IconButtonDefaults.filledIconToggleButtonColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                checkedContentColor = MaterialTheme.colorScheme.primary
-                            )
-                        ) {
-                            Icon(if (favoritesOnly) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null)
-                        }
-                    }
-
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 16.dp)) {
                     // Categories
                     LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         item { FilterChip(selectedCategory == null, "All") { selectedCategory = null } }
@@ -162,27 +177,63 @@ fun WorkoutsScreen(
                             FilterChip(selectedEquipment == eq, eq.label) { selectedEquipment = eq }
                         }
                     }
+
+                    // Duration
+                    LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item { FilterChip(selectedDuration == null, "Any Length") { selectedDuration = null } }
+                        items(listOf("Under 10", "10-20", "20+")) { d ->
+                            FilterChip(selectedDuration == d, "$d min") { selectedDuration = d }
+                        }
+                    }
+
+                    AnimatedVisibility(visible = hasActiveFilters) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "${filtered.size} workout${if (filtered.size == 1) "" else "s"} found",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            TextButton(onClick = { clearAllFilters() }) {
+                                Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Clear filters", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
                 }
             }
 
-            // Rows by Category
-            WorkoutCategory.entries.forEach { cat ->
-                val inCat = filtered.filter { it.category == cat }
-                if (inCat.isNotEmpty()) {
-                    item {
-                        WorkoutSectionHeader(cat.label)
-                        LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            items(inCat) { w ->
-                                WorkoutSessionCard(
-                                    workout = w,
-                                    isFavorite = favorites.contains(w.id),
-                                    onClick = { onOpenWorkout(w) },
-                                    onFavoriteClick = { viewModel.toggleFavorite(w.id) },
-                                    modifier = Modifier.width(260.dp)
-                                )
+            if (filtered.isEmpty()) {
+                item {
+                    EmptyWorkoutsState(
+                        isFavorites = favoritesOnly,
+                        onClearFilters = { clearAllFilters() }
+                    )
+                }
+            } else {
+                // Rows by Category
+                WorkoutCategory.entries.forEach { cat ->
+                    val inCat = filtered.filter { it.category == cat }
+                    if (inCat.isNotEmpty()) {
+                        item {
+                            WorkoutSectionHeader(cat.label, count = inCat.size)
+                            LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                items(inCat, key = { it.id }) { w ->
+                                    WorkoutSessionCard(
+                                        workout = w,
+                                        isFavorite = favorites.contains(w.id),
+                                        onClick = { onOpenWorkout(w) },
+                                        onFavoriteClick = { viewModel.toggleFavorite(w.id) },
+                                        modifier = Modifier.width(260.dp)
+                                    )
+                                }
                             }
+                            Spacer(Modifier.height(24.dp))
                         }
-                        Spacer(Modifier.height(24.dp))
                     }
                 }
             }
@@ -192,14 +243,26 @@ fun WorkoutsScreen(
 
 @Composable
 fun FilterChip(selected: Boolean, label: String, onClick: () -> Unit) {
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        animationSpec = tween(200),
+        label = "chipColor"
+    )
+    val contentColor = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+
     Surface(
         onClick = onClick,
-        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        color = containerColor,
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.height(36.dp)
     ) {
-        Box(Modifier.padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(Modifier.padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = contentColor
+            )
         }
     }
 }
@@ -207,6 +270,7 @@ fun FilterChip(selected: Boolean, label: String, onClick: () -> Unit) {
 @Composable
 private fun WorkoutSectionHeader(
     title: String,
+    count: Int = 0,
     showViewAll: Boolean = false,
     onViewAllClick: () -> Unit = {}
 ) {
@@ -217,12 +281,23 @@ private fun WorkoutSectionHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Bottom
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (count > 0) {
+                Text(
+                    text = "$count",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+            }
+        }
         if (showViewAll) {
             Text(
                 text = "See all",
@@ -264,30 +339,30 @@ private fun EmptyWorkoutsState(
                 )
             }
         }
-        
+
         Spacer(Modifier.height(24.dp))
-        
+
         Text(
             text = if (isFavorites) "No Favorites Yet" else "No Workouts Found",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        
+
         Spacer(Modifier.height(8.dp))
-        
+
         Text(
-            text = if (isFavorites) 
-                "Save your favorite routines to find them quickly here." 
-                else "We couldn't find any workouts matching your current filters.",
+            text = if (isFavorites)
+                "Save your favorite routines to find them quickly here."
+            else "We couldn't find any workouts matching your current filters.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 48.dp)
         )
-        
+
         Spacer(Modifier.height(24.dp))
-        
+
         TextButton(onClick = onClearFilters) {
             Text("Clear all filters", fontWeight = FontWeight.Bold)
         }

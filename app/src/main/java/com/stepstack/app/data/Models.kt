@@ -51,7 +51,7 @@ enum class Difficulty(val label: String) {
     INTERMEDIATE("Intermediate"),
     ADVANCED("Advanced"),
     EXPERT("Expert");
-    
+
     fun getReps(base: Int): Int = when(this) {
         BEGINNER -> (base * 0.8).toInt().coerceIn(8, 12)
         INTERMEDIATE -> (base * 1.0).toInt().coerceIn(12, 15)
@@ -116,7 +116,12 @@ data class User(
     val weight: Float = 70f,
     val height: Float = 170f,
     val exclusions: List<String> = emptyList(),
-    val manualDifficultyOverride: Boolean = false
+    val manualDifficultyOverride: Boolean = false,
+    // Consecutive days (ending today or yesterday, see [currentStreakDays]) the
+    // user has hit that day's step goal. Kept on User so it's available anywhere
+    // vm.user is, without recomputing from the full DailyActivity history on
+    // every read (e.g. CompetitionHeader's stat chip).
+    val currentStreakDays: Int = 0
 )
 
 @Serializable
@@ -175,8 +180,41 @@ data class DailyActivity(
     val distanceMeters: Int = 0,
     val caloriesBurned: Int = 0
 ) {
-    val movementScore: Int 
+    val movementScore: Int
         get() = steps + (workoutMinutes * 120) + (if (steps >= goalForDay && goalForDay > 0) 500 else 0)
+
+    val goalMet: Boolean
+        get() = goalForDay > 0 && steps >= goalForDay
+}
+
+/**
+ * Consecutive-day streak ending at [today] (defaults to the most recent
+ * entry's day). A day counts if [DailyActivity.goalMet] is true. Today itself
+ * is allowed to be missing or not-yet-met without breaking the streak, so the
+ * count doesn't drop to zero first thing in the morning before steps sync in —
+ * the streak only breaks once a full day passes with the goal unmet.
+ *
+ * Call this wherever DailyActivity history is loaded (e.g. after Firestore /
+ * local DB sync in AppViewModel) and store the result on User.currentStreakDays.
+ */
+fun List<DailyActivity>.currentStreakDays(today: Long? = null): Int {
+    val actualToday = today ?: this.maxOfOrNull { it.epochDay } ?: return 0
+    val byDay = this.associateBy { it.epochDay }
+    var streak = 0
+    var day = actualToday
+    // Today is allowed to still be in progress: skip it in the count if it
+    // hasn't met goal yet, but don't let it break the streak either.
+    val todayEntry = byDay[today]
+    if (todayEntry == null || !todayEntry.goalMet) {
+        day -= 1
+    }
+    while (true) {
+        val entry = byDay[day] ?: break
+        if (!entry.goalMet) break
+        streak++
+        day -= 1
+    }
+    return streak
 }
 
 @Serializable
@@ -253,7 +291,7 @@ data class NotificationSettings(
     val postWorkoutFollowUp: Boolean = true,
     val achievementUnlock: Boolean = true,
     val weeklyRecap: Boolean = true,
-    val quietHoursStart: Int = 22, 
+    val quietHoursStart: Int = 22,
     val quietHoursEnd: Int = 8,
     val reminderHour: Int = 8,
     val reminderMinute: Int = 0,
@@ -273,4 +311,81 @@ data class DailyTip(
     val title: String,
     val content: String,
     val icon: String
+)
+
+@Serializable
+enum class ChallengeType {
+    RACE_TOTAL_STEPS,
+    DAILY_GOAL_STREAK,
+    TOTAL_STEPS_DURATION
+}
+
+@Serializable
+enum class ChallengeStatus {
+    PENDING,
+    ACTIVE,
+    COMPLETED
+}
+
+@Serializable
+enum class ParticipantStatus {
+    INVITED,
+    ACCEPTED,
+    DECLINED
+}
+
+@Serializable
+enum class FriendshipStatus {
+    PENDING,
+    ACCEPTED,
+    BLOCKED
+}
+
+@Serializable
+data class Friendship(
+    val userId: String,
+    val friendId: String,
+    val status: FriendshipStatus,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+enum class ChallengeVisibility {
+    FRIENDS_ONLY,
+    COMMUNITY
+}
+
+@Serializable
+data class Challenge(
+    val id: String = "",
+    val title: String = "",
+    val type: ChallengeType = ChallengeType.RACE_TOTAL_STEPS,
+    val visibility: ChallengeVisibility = ChallengeVisibility.FRIENDS_ONLY,
+    val imageUrl: String = "",
+    val createdBy: String = "",
+    val startDate: Long = 0,
+    val endDate: Long = 0,
+    val dailyGoalTarget: Int? = null,
+    val status: ChallengeStatus = ChallengeStatus.PENDING,
+    val participantIds: List<String> = emptyList()
+)
+
+@Serializable
+data class ChallengeParticipant(
+    val challengeId: String,
+    val userId: String,
+    val status: ParticipantStatus = ParticipantStatus.INVITED,
+    val cumulativeSteps: Int = 0,
+    val joinedAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+data class FirestoreUser(
+    val uid: String = "",
+    val username: String = "",
+    val displayName: String = "",
+    val avatarUrl: String = "",
+    val lastSyncedStepCount: Int = 0,
+    val lastSyncedAt: Long = 0
 )

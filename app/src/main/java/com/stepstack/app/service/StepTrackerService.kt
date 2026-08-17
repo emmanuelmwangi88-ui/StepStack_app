@@ -32,7 +32,7 @@ class StepTrackerService : Service() {
 
         private val _activeWorkoutName = MutableStateFlow<String?>(null)
         val activeWorkoutName = _activeWorkoutName.asStateFlow()
-        
+
         private val _workoutTimerSeconds = MutableStateFlow<Int?>(null)
         val workoutTimerSeconds = _workoutTimerSeconds.asStateFlow()
 
@@ -46,7 +46,7 @@ class StepTrackerService : Service() {
     private lateinit var db: AppDatabase
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var wakeLock: android.os.PowerManager.WakeLock? = null
-    
+
     private val NOTIFICATION_ID = 101
     private val CHANNEL_ID = "step_tracker_channel"
 
@@ -57,12 +57,13 @@ class StepTrackerService : Service() {
     // Debounce/Throttle: write to DB every 5 steps or every 30 seconds
     private val STEP_BATCH_THRESHOLD = 5
     private val TIME_BATCH_THRESHOLD_MS = 30000L
+    private val DAY_ROLLOVER_CHECK_MS = 30000L
 
     override fun onCreate() {
         super.onCreate()
         db = AppDatabase.getDatabase(this)
         counterManager = StepCounterManager(this)
-        
+
         // Acquire partial wake lock to keep sensors alive
         val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
         wakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "StepStack:StepTrackerWakeLock")
@@ -75,7 +76,7 @@ class StepTrackerService : Service() {
             currentSteps = steps
             _todaySteps.value = steps
             updateNotification()
-            
+
             val now = System.currentTimeMillis()
             // Throttle database writes
             if (steps - lastSavedSteps >= STEP_BATCH_THRESHOLD || (now - lastSaveTime > TIME_BATCH_THRESHOLD_MS)) {
@@ -88,24 +89,29 @@ class StepTrackerService : Service() {
             launch { _activeWorkoutName.collect { updateNotification() } }
             launch { _workoutTimerSeconds.collect { updateNotification() } }
         }
-        
+
         counterManager.onStepDetected = {
             _stepDetectorEvents.tryEmit(Unit)
             // Instant feedback event (one physical step detected)
             serviceScope.launch(Dispatchers.IO) {
-                db.activityDao().insertStepEvent(StepEventEntity(
-                    timestamp = System.currentTimeMillis(),
-                    epochDay = LocalDate.now().toEpochDay()
-                ))
+                db.activityDao().insertStepEvent(
+                    StepEventEntity(
+                        timestamp = System.currentTimeMillis(),
+                        epochDay = LocalDate.now().toEpochDay()
+                    )
+                )
             }
         }
 
+        // Check for day rollover BEFORE starting tracking so a stale baseline from
+        // yesterday never gets restored and displayed, even momentarily.
+        checkDayRollover()
         counterManager.startTracking()
-        
-        // Day rollover check (periodic)
+
+        // Periodic day rollover check (covers the service staying alive across midnight)
         serviceScope.launch {
             while (isActive) {
-                delay(TIME_BATCH_THRESHOLD_MS)
+                delay(DAY_ROLLOVER_CHECK_MS)
                 checkDayRollover()
             }
         }
@@ -124,15 +130,15 @@ class StepTrackerService : Service() {
         val today = LocalDate.now().toEpochDay()
         val prefs = getSharedPreferences("stepstack_tracking_prefs", MODE_PRIVATE)
         val lastDay = prefs.getLong("last_tracked_day", -1L)
-        
+
         if (lastDay != -1L && today > lastDay) {
             Log.i("StepTrackerService", "New day detected ($today). Resetting today's baseline.")
             // 1. Save final count for the old day explicitly
             saveStepsToDb(currentSteps, lastDay)
-            
+
             // 2. Reset manager baseline using the latest raw value
             counterManager.resetForNewDay()
-            
+
             // 3. Update state
             prefs.edit().putLong("last_tracked_day", today).apply()
             currentSteps = 0
@@ -147,21 +153,21 @@ class StepTrackerService : Service() {
 
     private fun saveStepsToDb(steps: Int, day: Long = LocalDate.now().toEpochDay()) {
         lastSaveTime = System.currentTimeMillis()
-        
+
         serviceScope.launch(Dispatchers.IO) {
             val existing = db.activityDao().getActivityForDay(day)
-            
+
             // Basic estimation: 0.04 kcal per step, 0.75m per step
             val calories = (steps * 0.04).toInt() + (existing?.workoutMinutes ?: 0) * 7
             val distance = (steps * 0.75).toInt()
-            
+
             val updated = (existing ?: DailyActivityEntity(day, steps, 0)).copy(
                 steps = steps,
                 caloriesBurned = calories,
                 distanceMeters = distance
             )
             db.activityDao().insertActivity(updated)
-            
+
             if (day == LocalDate.now().toEpochDay()) {
                 lastSavedSteps = steps
             }
@@ -183,13 +189,13 @@ class StepTrackerService : Service() {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent, 
+            this, 0, intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
         val workoutName = _activeWorkoutName.value
         val timer = _workoutTimerSeconds.value
-        
+
         val contentText = if (workoutName != null) {
             val timeStr = if (timer != null) " - %02d:%02d".format(timer / 60, timer % 60) else ""
             "Workout: $workoutName$timeStr | %,d steps".format(steps)

@@ -13,11 +13,7 @@ import androidx.lifecycle.viewModelScope
 import com.stepstack.app.data.*
 import com.stepstack.app.notifications.NotificationSystem
 import com.stepstack.app.service.StepTrackerService
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.math.roundToInt
@@ -25,6 +21,12 @@ import kotlin.math.roundToInt
 class AppViewModel : ViewModel() {
 
     var onboardingComplete by mutableStateOf(false)
+        private set
+    
+    var isDemoMode by mutableStateOf(false)
+        private set
+
+    var isSyncing by mutableStateOf(false)
         private set
 
     var user by mutableStateOf(User())
@@ -57,8 +59,15 @@ class AppViewModel : ViewModel() {
     val appNotifications = mutableStateListOf<AppNotification>()
     val graceDaysUsed = mutableStateListOf<Long>()
 
+    val activeChallenges = mutableStateListOf<Challenge>()
+    var isChallengesLoading by mutableStateOf(false)
+    val friends = mutableStateListOf<FirestoreUser>()
+    val allUsers = mutableStateListOf<FirestoreUser>()
+    var isFriendsLoading by mutableStateOf(false)
+
     var currentStreak by mutableStateOf(0)
         private set
+    val totalLifetimeSteps: Long get() = activityHistory.sumOf { it.steps.toLong() }
     var graceDaysRemaining by mutableIntStateOf(3)
         private set
 
@@ -79,9 +88,9 @@ class AppViewModel : ViewModel() {
 
     private var healthConnectClient: androidx.health.connect.client.HealthConnectClient? = null
     private var toneGenerator: ToneGenerator? = null
+    private var periodicSyncJob: Job? = null
 
     init {
-        achievements.addAll(SampleData.achievements)
         try {
             toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100)
         } catch (e: Exception) {
@@ -124,6 +133,22 @@ class AppViewModel : ViewModel() {
                     exercisesJson = Json.encodeToString(w.exercises)
                 )
             })
+
+            // Achievements
+            val savedAchievements = db.achievementDao().getAllAchievements()
+            if (savedAchievements.isEmpty()) {
+                val initial = SampleData.achievements.map { a ->
+                    AchievementEntity(a.id, a.title, a.description, a.icon, a.unlocked)
+                }
+                db.achievementDao().insertAchievements(initial)
+                achievements.clear()
+                achievements.addAll(SampleData.achievements)
+            } else {
+                achievements.clear()
+                achievements.addAll(savedAchievements.map { a ->
+                    Achievement(a.id, a.title, a.description, a.icon, a.unlocked)
+                })
+            }
 
             // History
             db.activityDao().getActivityFrom(0).let { history ->
@@ -177,9 +202,11 @@ class AppViewModel : ViewModel() {
                     WorkoutSession(it.workoutId, it.workoutName, it.dateEpochDay, it.durationActualMin, it.completedPercent, it.exercisesCompleted, 0, 0, it.caloriesBurned, it.startTimeMillis)
                 })
             }
+            refreshHourlyActivity()
         }
 
         onboardingComplete = p.getBoolean("onboarding_complete", false)
+        isDemoMode = p.getBoolean("is_demo_mode", false)
         profilePicIndex = p.getInt("profile_pic_index", 0)
         customStepGoal = p.getInt("custom_step_goal", 8000)
         themeMode = p.getString("theme_mode", "System") ?: "System"
@@ -193,6 +220,8 @@ class AppViewModel : ViewModel() {
             p.getString("user_data", null)?.let {
                 try { user = Json.decodeFromString(it) } catch (e: Exception) { onboardingComplete = false }
             }
+            startPeriodicSync()
+            refreshCompetitionData()
         }
 
         // Real-time flow observation from service for "immediate" UI updates
@@ -211,8 +240,74 @@ class AppViewModel : ViewModel() {
                     if (isWalking) {
                         walkCurrentSteps = (steps - walkStartSteps).coerceAtLeast(0)
                     }
+                    refreshHourlyActivity()
                 }
             }
+        }
+    }
+
+    private fun startPeriodicSync() {
+        periodicSyncJob?.cancel()
+        periodicSyncJob = viewModelScope.launch {
+            while (isActive) {
+                if (FirebaseManager.isUserLoggedIn()) {
+                    syncWithFirebase()
+                }
+                delay(15 * 60 * 1000) // 15 minutes
+            }
+        }
+    }
+
+    fun refreshCompetitionData() {
+        viewModelScope.launch {
+            if (activeChallenges.isEmpty()) isChallengesLoading = true
+            if (friends.isEmpty()) isFriendsLoading = true
+            
+            val remoteChallenges = FirebaseManager.getActiveChallenges()
+            activeChallenges.clear()
+            activeChallenges.addAll(remoteChallenges)
+            isChallengesLoading = false
+            
+            if (FirebaseManager.isUserLoggedIn()) {
+                val remoteFriends = FirebaseManager.getFriends()
+                friends.clear()
+                friends.addAll(remoteFriends)
+            }
+            
+            val remoteAllUsers = FirebaseManager.getAllUsers()
+            allUsers.clear()
+            allUsers.addAll(remoteAllUsers)
+            isFriendsLoading = false
+        }
+    }
+
+    fun createChallenge(title: String, type: ChallengeType, visibility: ChallengeVisibility, goal: Int, imageUrl: String, invites: List<String>) {
+        viewModelScope.launch {
+            val challenge = Challenge(
+                title = title,
+                type = type,
+                visibility = visibility,
+                imageUrl = imageUrl,
+                startDate = System.currentTimeMillis(),
+                endDate = System.currentTimeMillis() + (7 * 24 * 60 * 60 * 1000), 
+                dailyGoalTarget = goal
+            )
+            FirebaseManager.createChallenge(challenge, invites)
+            refreshCompetitionData()
+        }
+    }
+    
+    fun joinChallenge(challengeId: String) {
+        viewModelScope.launch {
+            FirebaseManager.joinChallenge(challengeId)
+            refreshCompetitionData()
+        }
+    }
+
+    fun deleteChallenge(challengeId: String) {
+        viewModelScope.launch {
+            FirebaseManager.deleteChallenge(challengeId)
+            refreshCompetitionData()
         }
     }
 
@@ -220,6 +315,7 @@ class AppViewModel : ViewModel() {
         val p = prefs ?: context?.getSharedPreferences("stepstack_prefs", Context.MODE_PRIVATE) ?: return
         p.edit().apply {
             putBoolean("onboarding_complete", onboardingComplete)
+            putBoolean("is_demo_mode", isDemoMode)
             putString("user_data", Json.encodeToString(user))
             putInt("grace_days_left", graceDaysRemaining)
             putInt("profile_pic_index", profilePicIndex)
@@ -433,9 +529,16 @@ class AppViewModel : ViewModel() {
         return when { ratio > 1.3f -> "Recovery"; ratio < 0.7f -> "Push"; else -> "Steady" }
     }
 
-    fun completeOnboarding(context: Context, draft: OnboardingDraft) {
+    fun resetOnboarding(context: Context) {
+        onboardingComplete = false
+        isDemoMode = false
+        saveData(context)
+    }
+
+    fun completeOnboarding(context: Context, draft: OnboardingDraft, isDemo: Boolean = false) {
+        isDemoMode = isDemo
         user = User(
-            name = draft.name.ifBlank { "Athlete" },
+            name = draft.name.ifBlank { if (isDemo) "Guest Athlete" else "Athlete" },
             email = draft.email,
             goal = draft.goal ?: GoalType.GENERAL_HEALTH,
             activityLevel = draft.activityLevel ?: ActivityLevel.LIGHT,
@@ -448,6 +551,9 @@ class AppViewModel : ViewModel() {
         }
         onboardingComplete = true
         updateStreak(); saveData(context)
+        if (!isDemoMode) {
+            startPeriodicSync()
+        }
         notificationSystem.scheduleDailyReminder(notificationSettings.reminderHour, notificationSettings.reminderMinute)
     }
 
@@ -467,6 +573,7 @@ class AppViewModel : ViewModel() {
                 caloriesBurned = totalCalories
             ))
             checkAchievements()
+            syncWithFirebase()
         }
     }
 
@@ -554,6 +661,7 @@ class AppViewModel : ViewModel() {
 
     fun addBodyStat(context: Context, weight: Float) {
         bodyStats.add(BodyStat(today, weight))
+        user = user.copy(weight = weight)
         saveData(context)
     }
 
@@ -564,24 +672,41 @@ class AppViewModel : ViewModel() {
     fun logout(context: Context) {
         FirebaseManager.logout()
         onboardingComplete = false
+        isDemoMode = false
         user = User()
         saveData(context)
     }
 
-    fun syncFromFirebase(context: Context) {
-        if (!FirebaseManager.isUserLoggedIn()) return
+    fun syncFromFirebase(context: Context, onResult: (Boolean) -> Unit = {}) {
+        if (!FirebaseManager.isUserLoggedIn()) {
+            onResult(false)
+            return
+        }
+        isSyncing = true
         viewModelScope.launch {
-            val remoteUser = FirebaseManager.fetchUser()
-            if (remoteUser != null) {
-                user = remoteUser
-                onboardingComplete = true
-                saveData(context)
+            try {
+                val remoteUser = FirebaseManager.fetchUser()
+                if (remoteUser != null) {
+                    user = remoteUser
+                    onboardingComplete = true
+                    saveData(context)
+                    startPeriodicSync()
+                    refreshCompetitionData()
+                    onResult(true)
+                } else {
+                    onResult(false)
+                }
+            } catch (e: Exception) {
+                Log.e("AppViewModel", "Firebase sync failed", e)
+                onResult(false)
+            } finally {
+                isSyncing = false
             }
         }
     }
 
     fun syncWithFirebase() {
-        if (!FirebaseManager.isUserLoggedIn()) return
+        if (isDemoMode || !FirebaseManager.isUserLoggedIn()) return
         viewModelScope.launch {
             FirebaseManager.saveUser(user)
             FirebaseManager.syncActivity(todayActivity)
@@ -616,11 +741,13 @@ class AppViewModel : ViewModel() {
         return result
     }
 
-    fun dayHourlyActivity(): List<Int> {
+    var dayHourlyActivity = mutableStateListOf<Int>().apply { addAll(List(24) { 0 }) }
+        private set
+
+    fun refreshHourlyActivity() {
         val t = today
-        val hourly = MutableList(24) { 0 }
-        
-        runBlocking {
+        viewModelScope.launch(Dispatchers.IO) {
+            val hourly = MutableList(24) { 0 }
             try {
                 val events = db.activityDao().getStepEventsForDay(t)
                 events.forEach { ts ->
@@ -641,11 +768,14 @@ class AppViewModel : ViewModel() {
                         hourly[h] += (session.durationActualMin * 2) / durationHours 
                     }
                 }
+                withContext(Dispatchers.Main) {
+                    dayHourlyActivity.clear()
+                    dayHourlyActivity.addAll(hourly)
+                }
             } catch (e: Exception) {
                 Log.e("AppViewModel", "Error fetching hourly activity", e)
             }
         }
-        return hourly
     }
 
     val activePlan: WorkoutPlan?

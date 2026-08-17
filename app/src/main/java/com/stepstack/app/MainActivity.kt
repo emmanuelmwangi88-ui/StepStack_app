@@ -18,6 +18,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -126,33 +127,49 @@ class MainActivity : ComponentActivity() {
                     }
 
                     var showSplash by remember { mutableStateOf(true) }
-                    var isOnboarding by remember { mutableStateOf(false) }
+                    var showAuth by remember { mutableStateOf(false) }
 
                     if (showSplash) {
                         com.stepstack.app.ui.screens.SplashScreen { showSplash = false }
-                    } else if (!isLoggedIn) {
-                        if (isOnboarding) {
-                            OnboardingScreen(
-                                onComplete = { 
-                                    vm.completeOnboarding(context, it)
-                                    isOnboarding = false
-                                },
-                                onBackToAuth = { isOnboarding = false }
-                            )
-                        } else {
-                            com.stepstack.app.ui.screens.AuthScreen(
-                                onAuthSuccess = { vm.syncFromFirebase(context) },
-                                onNavigateToOnboarding = { isOnboarding = true }
-                            )
+                    } else if (vm.isSyncing) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                            CircularProgressIndicator()
                         }
-                    } else if (!vm.onboardingComplete) {
-                        // User is logged in but hasn't finished profile data
-                        OnboardingScreen(
-                            onComplete = { vm.completeOnboarding(context, it) },
-                            onBackToAuth = { /* Should maybe logout or just stay */ }
+                    } else if (showAuth) {
+                        com.stepstack.app.ui.screens.AuthScreen(
+                            onAuthSuccess = { 
+                                vm.syncFromFirebase(context) { success ->
+                                    if (success) {
+                                        showAuth = false
+                                    } else {
+                                        // If sync failed (e.g. new user), we stay in auth/onboarding
+                                        showAuth = false 
+                                    }
+                                }
+                            },
+                            onNavigateToOnboarding = { showAuth = false }
                         )
-                    } else {
+                    } else if (!vm.onboardingComplete) {
+                        OnboardingScreen(
+                            onComplete = { vm.completeOnboarding(context, it, isDemo = false) },
+                            onSkipAuth = { vm.completeOnboarding(context, it, isDemo = true) },
+                            onBackToAuth = { /* no-op */ },
+                            onNavigateToSignIn = { showAuth = true }
+                        )
+                    } else if (isLoggedIn || vm.isDemoMode) {
                         MainApp(vm)
+                    } else {
+                        com.stepstack.app.ui.screens.AuthScreen(
+                            onAuthSuccess = { 
+                                vm.syncFromFirebase(context) { _ ->
+                                    showAuth = false
+                                }
+                            },
+                            onNavigateToOnboarding = { 
+                                // If the user wants to "Get Started" again, allow them to see onboarding
+                                vm.resetOnboarding(context)
+                            }
+                        )
                     }
                 }
             }
@@ -181,7 +198,7 @@ fun MainApp(vm: AppViewModel) {
 
     val backStack by navController.currentBackStackEntryAsState()
     val route = backStack?.destination?.route
-    val showBars = route in listOf(Route.Home.route, Route.Workouts.route, Route.Steps.route, Route.Profile.route)
+    val showBars = route in listOf(Route.Home.route, Route.Workouts.route, Route.Steps.route, Route.Profile.route, Route.Competition.route)
     
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
@@ -200,6 +217,7 @@ fun MainApp(vm: AppViewModel) {
                             Route.Workouts.route -> "Workouts"
                             Route.Steps.route -> "Steps"
                             Route.Profile.route -> "Profile"
+                            Route.Competition.route -> "Competition"
                             else -> ""
                         }
                         Text(
@@ -210,6 +228,11 @@ fun MainApp(vm: AppViewModel) {
                         )
                     },
                     actions = {
+                        if (route == Route.Home.route) {
+                            IconButton(onClick = { navController.navigate(Route.Notifications.route) }) {
+                                Icon(Icons.Default.Notifications, null, tint = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                         if (route == Route.Steps.route) {
                             IconButton(onClick = { showLogOutdoor = true }) {
                                 Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary)
@@ -293,10 +316,11 @@ fun BottomNav(navController: NavHostController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    data class Tab(val route: String, val label: String, val sel: androidx.compose.ui.graphics.vector.ImageVector, val unsel: androidx.compose.ui.graphics.vector.ImageVector)
+    data class Tab(val route: String, val label: String, val sel: androidx.compose.ui.graphics.vector.ImageVector, val unsel: androidx.compose.ui.graphics.vector.ImageVector, val isSpecial: Boolean = false)
     val tabs = listOf(
         Tab(Route.Home.route, "Home", Icons.Filled.Home, Icons.Outlined.Home),
         Tab(Route.Workouts.route, "Workouts", Icons.Filled.FitnessCenter, Icons.Outlined.FitnessCenter),
+        Tab(Route.Competition.route, "VS", Icons.Filled.EmojiEvents, Icons.Outlined.EmojiEvents, isSpecial = true),
         Tab(Route.Steps.route, "Steps", Icons.Filled.DirectionsWalk, Icons.Outlined.DirectionsWalk),
         Tab(Route.Profile.route, "Profile", Icons.Filled.Person, Icons.Outlined.Person),
     )
@@ -304,14 +328,37 @@ fun BottomNav(navController: NavHostController) {
     NavigationBar(
         modifier = Modifier.height(UIConstants.BottomNavHeight),
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
+        tonalElevation = 8.dp,
     ) {
         tabs.forEach { tab ->
             val selected = currentRoute == tab.route
-            val color = MaterialTheme.colorScheme.primary
+            // COMPETITION ICON COLOR
+            val competitionColor = Color(0xFFFF9800) 
+            val color = if (tab.isSpecial) competitionColor else MaterialTheme.colorScheme.primary
+            
             NavigationBarItem(
-                icon = { Icon(if (selected) tab.sel else tab.unsel, contentDescription = tab.label, modifier = Modifier.size(24.dp)) },
-                label = { Text(tab.label, style = MaterialTheme.typography.labelSmall) },
+                icon = { 
+                    if (tab.isSpecial) {
+                        Surface(
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = if (selected) color else color.copy(alpha = 0.2f),
+                            tonalElevation = 4.dp,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
+                                Icon(
+                                    if (selected) tab.sel else tab.unsel, 
+                                    contentDescription = tab.label, 
+                                    modifier = Modifier.size(28.dp),
+                                    tint = if (selected) MaterialTheme.colorScheme.onTertiary else color
+                                )
+                            }
+                        }
+                    } else {
+                        Icon(if (selected) tab.sel else tab.unsel, contentDescription = tab.label, modifier = Modifier.size(24.dp))
+                    }
+                },
+                label = { if (!tab.isSpecial) Text(tab.label, style = MaterialTheme.typography.labelSmall) },
                 selected = selected,
                 onClick = {
                     if (currentRoute != tab.route) {
@@ -325,9 +372,9 @@ fun BottomNav(navController: NavHostController) {
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = color,
+                    selectedIconColor = Color(0xFFE56330),
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    indicatorColor = color.copy(alpha = 0.1f)
+                    indicatorColor = if (tab.isSpecial) androidx.compose.ui.graphics.Color.Transparent else color.copy(alpha = 0.1f)
                 ),
             )
         }

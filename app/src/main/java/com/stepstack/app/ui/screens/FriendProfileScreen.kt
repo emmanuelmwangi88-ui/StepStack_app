@@ -1,15 +1,19 @@
 package com.stepstack.app.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,7 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.stepstack.app.data.*
+import com.stepstack.app.ui.theme.*
 import com.stepstack.app.viewmodel.AppViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,107 +38,329 @@ fun FriendProfileScreen(
     onBack: () -> Unit,
     vm: AppViewModel
 ) {
+    val scope = rememberCoroutineScope()
     var friend by remember { mutableStateOf<FirestoreUser?>(null) }
+    var friendshipStatus by remember { mutableStateOf<FriendshipStatus?>(null) }
+    var rank by remember { mutableStateOf<Int?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+
+    fun refreshStatus() {
+        scope.launch {
+            friendshipStatus = FirebaseManager.getFriendshipStatus(uid)
+        }
+    }
 
     LaunchedEffect(uid) {
         friend = FirebaseManager.getFirestoreUser(uid)
+        
+        // Calculate rank
+        val allUsers = FirebaseManager.getAllUsers()
+        val sortedUsers = allUsers.sortedByDescending { it.lastSyncedStepCount }
+        val index = sortedUsers.indexOfFirst { it.uid == uid }
+        if (index != -1) {
+            rank = index + 1
+        }
+        
+        refreshStatus()
         isLoading = false
     }
 
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = DarkBackground,
         topBar = {
             TopAppBar(
-                title = { Text("Profile") },
+                title = { },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, null)
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.3f))
+                    ) {
+                        Icon(Icons.Default.ArrowBack, null, tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent
                 )
             )
         }
     ) { padding ->
         if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = DarkPrimary)
             }
         } else if (friend == null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("User not found")
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("User not found", color = DarkOnSurface)
             }
         } else {
             val u = friend!!
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceVariant)
-                        )
-                    ),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .verticalScroll(rememberScrollState())
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                AsyncImage(
-                    model = u.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${u.displayName}&background=random" },
-                    contentDescription = null,
+                // Header Profile Area
+                Box(
                     modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                    contentScale = ContentScale.Crop
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    text = u.displayName,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Black
-                )
-                Text(
-                    text = "@${u.username}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Spacer(modifier = Modifier.height(32.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                        .fillMaxWidth()
+                        .height(320.dp)
                 ) {
-                    StatItem(label = "Today's Steps", value = u.lastSyncedStepCount.toString())
-                    StatItem(label = "Rank", value = "#--") // Rank calc is complex for single profile
+                    // Cover Gradient
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(DarkPrimary.copy(alpha = 0.4f), DarkBackground)
+                                )
+                            )
+                    )
+                    
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 80.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        AsyncImage(
+                            model = u.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${u.displayName}&background=random" },
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(CircleShape)
+                                .background(DarkSurfaceVariant),
+                            contentScale = ContentScale.Crop
+                        )
+                        
+                        Spacer(Modifier.height(16.dp))
+                        
+                        Text(
+                            text = u.displayName,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Black,
+                            color = DarkOnSurface
+                        )
+                        Text(
+                            text = "@${u.username}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = DarkOnSurfaceVariant
+                        )
+
+                        Spacer(Modifier.height(20.dp))
+
+                        // Friend Action Button
+                        if (uid != FirebaseManager.userId) {
+                            FriendActionButton(
+                                status = friendshipStatus,
+                                onAction = {
+                                    scope.launch {
+                                        when (friendshipStatus) {
+                                            null -> {
+                                                FirebaseManager.sendFriendRequest(uid)
+                                                refreshStatus()
+                                            }
+                                            else -> {}
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
-                
-                Spacer(modifier = Modifier.height(32.dp))
-                
+
+                // Stats Section
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    ModernStatCard(
+                        modifier = Modifier.weight(1f),
+                        label = "Today's Steps",
+                        value = u.lastSyncedStepCount.toString(),
+                        icon = Icons.Default.DirectionsWalk,
+                        color = DarkPrimary
+                    )
+                    ModernStatCard(
+                        modifier = Modifier.weight(1f),
+                        label = "Global Rank",
+                        value = if (rank != null) "#$rank" else "#--",
+                        icon = Icons.Default.EmojiEvents,
+                        color = Amber500
+                    )
+                }
+
+                Spacer(Modifier.height(32.dp))
+
+                // Achievements Section
                 Text(
                     "Achievements",
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Black,
+                    color = DarkOnSurface
                 )
                 
-                // PFP list placeholder or actual achievements if synced
-                Box(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-                    Text("Achievements are private or not yet synced.", color = Color.Gray)
+                Spacer(Modifier.height(16.dp))
+                
+                // Achievements Grid logic
+                val achievementsList = listOf("a1", "a3", "a4", "a7", "a8", "a9")
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                ) {
+                    achievementsList.chunked(3).forEach { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            row.forEach { id ->
+                                val ach = SampleData.achievements.find { it.id == id }
+                                if (ach != null) {
+                                    ModernAchievementItem(
+                                        modifier = Modifier.weight(1f),
+                                        achievement = ach
+                                    )
+                                } else {
+                                    Spacer(Modifier.weight(1f))
+                                }
+                            }
+                            if (row.size < 3) {
+                                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                            }
+                        }
+                    }
                 }
+                
+                Spacer(Modifier.height(40.dp))
             }
         }
     }
 }
 
 @Composable
-fun StatItem(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+fun FriendActionButton(status: FriendshipStatus?, onAction: () -> Unit) {
+    val containerColor = when (status) {
+        null -> DarkPrimary
+        FriendshipStatus.PENDING -> DarkSurfaceVariant
+        FriendshipStatus.ACCEPTED -> Color.Transparent
+        else -> DarkPrimary
+    }
+    
+    val contentColor = when (status) {
+        null -> Color.Black
+        FriendshipStatus.PENDING -> DarkOnSurfaceVariant
+        FriendshipStatus.ACCEPTED -> DarkPrimary
+        else -> Color.Black
+    }
+
+    val text = when (status) {
+        null -> "Add Friend"
+        FriendshipStatus.PENDING -> "Pending"
+        FriendshipStatus.ACCEPTED -> "Friends"
+        else -> "Add Friend"
+    }
+    
+    val icon = when (status) {
+        null -> Icons.Default.PersonAdd
+        FriendshipStatus.PENDING -> Icons.Default.AccessTime
+        FriendshipStatus.ACCEPTED -> Icons.Default.Check
+        else -> Icons.Default.PersonAdd
+    }
+
+    Button(
+        onClick = onAction,
+        modifier = Modifier.height(48.dp),
+        shape = RoundedCornerShape(24.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        ),
+        border = if (status == FriendshipStatus.ACCEPTED) BorderStroke(1.dp, DarkPrimary) else null,
+        enabled = status == null
+    ) {
+        Icon(icon, null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(text, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun ModernStatCard(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = DarkSurface),
+        border = BorderStroke(1.dp, DarkOutline)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, tint = color, modifier = Modifier.size(16.dp))
+            }
+            
+            Spacer(Modifier.height(12.dp))
+            
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Black,
+                color = DarkOnSurface
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = DarkOnSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun ModernAchievementItem(modifier: Modifier = Modifier, achievement: Achievement) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            modifier = Modifier.size(70.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = DarkSurface,
+            border = BorderStroke(1.dp, DarkOutline)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(achievement.icon, fontSize = 32.sp)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            achievement.title,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = DarkOnSurface,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = 2
+        )
     }
 }

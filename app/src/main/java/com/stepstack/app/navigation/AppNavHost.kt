@@ -105,6 +105,30 @@ fun AppNavHost(
                 padding = padding
             )
         }
+        composable(Route.Competition.route) {
+            CompetitionHomeScreen(
+                vm = vm,
+                padding = padding,
+                onOpenFriend = { navController.navigate(Route.FriendProfile.createRoute(it)) },
+                onOpenChallenge = { navController.navigate(Route.ChallengeDetail.createRoute(it)) }
+            )
+        }
+        composable(Route.FriendProfile.route) { entry ->
+            val uid = entry.arguments?.getString("uid") ?: return@composable
+            FriendProfileScreen(
+                uid = uid,
+                onBack = { navController.popBackStack() },
+                vm = vm
+            )
+        }
+        composable(Route.ChallengeDetail.route) { entry ->
+            val id = entry.arguments?.getString("id") ?: return@composable
+            ChallengeDetailScreen(
+                challengeId = id,
+                onBack = { navController.popBackStack() },
+                vm = vm
+            )
+        }
         composable(Route.WorkoutDetail.route) { entry ->
             val id = entry.arguments?.getString("id") ?: return@composable
             val workout = workoutVm.getWorkoutById(id) ?: return@composable
@@ -213,6 +237,13 @@ fun AppNavHost(
         }
         composable(Route.History.route) {
             WorkoutHistoryScreen(vm = vm, onBack = { navController.popBackStack() })
+        }
+        composable(Route.Notifications.route) {
+            NotificationsScreen(
+                vm = vm,
+                onBack = { navController.popBackStack() },
+                onOpenProfile = { navController.navigate(Route.FriendProfile.createRoute(it)) }
+            )
         }
     }
 }

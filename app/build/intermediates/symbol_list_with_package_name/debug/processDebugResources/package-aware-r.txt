@@ -2050,7 +2050,6 @@ drawable play
 drawable play_overlay
 drawable rotate_90
 drawable selected_thumbnail_border
-drawable stepminilogo
 drawable stepstacklogo
 drawable stepstacklogo_background
 drawable stepstacksplashscreen
@@ -2889,6 +2888,7 @@ string copy_toast_msg
 string default_error_message
 string default_error_msg
 string default_popup_window_title
+string default_web_client_id
 string done
 string dropdown_menu
 string error_icon_content_description
@@ -2951,6 +2951,7 @@ string fab_transformation_sheet_behavior
 string fallback_menu_item_copy_link
 string fallback_menu_item_open_in_browser
 string fallback_menu_item_share_link
+string fcm_fallback_notification_channel_label
 string fingerprint_dialog_touch_sensor
 string fingerprint_error_hw_not_available
 string fingerprint_error_hw_not_present

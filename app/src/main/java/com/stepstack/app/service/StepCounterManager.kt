@@ -10,13 +10,18 @@ import android.util.Log
 
 /**
  * Robust manager for hardware step sensors.
- * Uses TYPE_STEP_COUNTER as the absolute source of truth.
- * Uses TYPE_STEP_DETECTOR for immediate, real-time feedback.
- * 
- * Logic:
- * 1. Counter returns total steps since device boot.
- * 2. We compute today's steps: currentTotal - baselineAtStartOfDay.
- * 3. Detector events are used for "instant" UI updates before the counter (which is batched by OS) fires.
+ *
+ * Design:
+ * 1. TYPE_STEP_COUNTER is the absolute source of truth. Every value it reports
+ *    is trusted immediately and fully — nothing is ever allowed to block or
+ *    override it.
+ * 2. TYPE_STEP_DETECTOR is used ONLY for instant per-step UI feedback between
+ *    counter batches (the OS can delay/batch counter events by many seconds).
+ *    Its contribution is capped and is wiped out the moment a real counter
+ *    event arrives, so it can never permanently corrupt the displayed count.
+ * 3. Raw sensor jumps that are physically implausible (e.g. thousands of
+ *    "steps" in under a second, which can happen on some OEMs after a sensor
+ *    glitch) are clamped rather than trusted outright.
  */
 class StepCounterManager(context: Context) : SensorEventListener {
 
@@ -29,38 +34,59 @@ class StepCounterManager(context: Context) : SensorEventListener {
     val isStepCounterAvailable: Boolean = stepCounterSensor != null
     val isStepDetectorAvailable: Boolean = stepDetectorSensor != null
 
-    /**
-     * Persisted baseline: the raw sensor value at the very start of the current day.
-     */
+    /** Persisted baseline: the raw sensor value at the very start of the current day. */
     private var baselineSteps: Int
         get() = prefs.getInt("baseline_steps", -1)
         set(value) = prefs.edit().putInt("baseline_steps", value).apply()
 
-    /**
-     * Persisted last known raw value to detect reboots.
-     */
+    /** Persisted last known raw value, used for reboot detection and restore-on-start. */
     private var lastKnownRawValue: Int
         get() = prefs.getInt("last_known_raw_value", -1)
         set(value) = prefs.edit().putInt("last_known_raw_value", value).apply()
 
     // Callbacks for the service/UI
     var onStepUpdate: ((Int) -> Unit)? = null      // Source of truth (today's total)
-    var onStepDetected: (() -> Unit)? = null       // Instant event (one step)
+    var onStepDetected: (() -> Unit)? = null       // Instant event (one physical step)
 
-    private var lastEmittedSteps: Int = 0
+    /** Last value confirmed directly by the hardware step counter. Always trusted. */
+    private var confirmedSteps: Int = 0
+
+    /**
+     * Cushion added on top of confirmedSteps purely for instant UI feedback between
+     * counter batches. Capped so it can never drift far from reality, and reset to
+     * zero the instant a real counter event lands.
+     */
+    private var provisionalExtra: Int = 0
+    private val MAX_PROVISIONAL_AHEAD = 5
+
+    /** Guards against implausible single-event jumps (sensor glitches / OEM bugs). */
+    private val MAX_PLAUSIBLE_STEPS_PER_EVENT = 2000
 
     fun startTracking() {
         if (!isStepCounterAvailable) {
-            Log.e("StepCounterManager", "Hardware Step Counter not available.")
-            // Fallback to detector if counter is missing? 
-            // Most modern phones have both, but we should register detector anyway.
+            Log.e("StepCounterManager", "Hardware Step Counter not available on this device.")
         }
+        if (!isStepDetectorAvailable) {
+            Log.w("StepCounterManager", "Step Detector not available — instant feedback disabled, counter-only mode.")
+        }
+
+        // Restore today's confirmed count from storage and push it immediately so the
+        // UI/notification don't sit at 0 waiting for the next physical step.
+        val savedBaseline = baselineSteps
+        val savedRaw = lastKnownRawValue
+        confirmedSteps = if (savedBaseline != -1 && savedRaw != -1) {
+            (savedRaw - savedBaseline).coerceAtLeast(0)
+        } else {
+            0
+        }
+        provisionalExtra = 0
+        onStepUpdate?.invoke(confirmedSteps)
 
         // Counter sensor for accuracy (Source of Truth)
         stepCounterSensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
-        
+
         // Detector sensor for real-time responsiveness
         stepDetectorSensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST)
@@ -82,16 +108,12 @@ class StepCounterManager(context: Context) : SensorEventListener {
             Sensor.TYPE_STEP_DETECTOR -> {
                 if (event.values[0] == 1.0f) {
                     onStepDetected?.invoke()
-                    // Fused logic: increment live count if detector fires
-                    // and it's higher than the last batched counter update
-                    val currentLive = lastKnownRawValue - baselineSteps
-                    if (currentLive >= 0) {
-                        val predicted = currentLive + 1
-                        // We only emit if we haven't already emitted this value from the counter
-                        if (predicted > lastEmittedSteps) {
-                            lastEmittedSteps = predicted
-                            onStepUpdate?.invoke(predicted)
-                        }
+
+                    // Instant feedback only — capped so it can never drift far ahead
+                    // and never blocks a subsequent real counter update.
+                    if (provisionalExtra < MAX_PROVISIONAL_AHEAD) {
+                        provisionalExtra++
+                        onStepUpdate?.invoke(confirmedSteps + provisionalExtra)
                     }
                 }
             }
@@ -99,37 +121,52 @@ class StepCounterManager(context: Context) : SensorEventListener {
     }
 
     private fun handleCounterEvent(currentRawValue: Int) {
-        // REBOOT DETECTION
-        if (currentRawValue < lastKnownRawValue && lastKnownRawValue != -1) {
+        val previousRaw = lastKnownRawValue
+
+        // REBOOT DETECTION: raw counter resets to a small number after a device reboot.
+        if (previousRaw != -1 && currentRawValue < previousRaw) {
             Log.i("StepCounterManager", "Device reboot detected. Adjusting baseline.")
-            val todayStepsBeforeReboot = (lastKnownRawValue - baselineSteps).coerceAtLeast(0)
+            val todayStepsBeforeReboot = (previousRaw - baselineSteps).coerceAtLeast(0)
             baselineSteps = currentRawValue - todayStepsBeforeReboot
         }
-        
+
+        // SANITY CHECK: guard against implausible single-event jumps.
+        // Instead of clamping the 'lastKnownRawValue' (which causes a catch-up loop as the sensor
+        // continues to report the large absolute value), we adjust the baseline to ignore the jump.
+        if (previousRaw != -1) {
+            val delta = currentRawValue - previousRaw
+            if (delta > MAX_PLAUSIBLE_STEPS_PER_EVENT) {
+                Log.w("StepCounterManager", "Implausible step jump ($delta) — adjusting baseline.")
+                val excess = delta - MAX_PLAUSIBLE_STEPS_PER_EVENT
+                baselineSteps += excess
+            }
+        }
+
         lastKnownRawValue = currentRawValue
 
         if (baselineSteps == -1) {
-            baselineSteps = currentRawValue
+            baselineSteps = lastKnownRawValue
         }
 
-        val todaySteps = (currentRawValue - baselineSteps).coerceAtLeast(0)
-        
-        // Update lastEmittedSteps so detector doesn't double count
-        if (todaySteps >= lastEmittedSteps) {
-            lastEmittedSteps = todaySteps
-            onStepUpdate?.invoke(todaySteps)
-        }
+        val todaySteps = (lastKnownRawValue - baselineSteps).coerceAtLeast(0)
+
+        // The counter is ground truth: always adopt it and clear the predictive cushion.
+        confirmedSteps = todaySteps
+        provisionalExtra = 0
+        onStepUpdate?.invoke(confirmedSteps)
     }
 
     /**
-     * Resets the baseline for a new day. 
-     * Call this at midnight.
+     * Resets the baseline for a new day.
+     * Call this at midnight / on day rollover.
      */
     fun resetForNewDay(currentRaw: Int? = null) {
         val newBaseline = currentRaw ?: lastKnownRawValue
         if (newBaseline != -1) {
             Log.i("StepCounterManager", "Day rollover: Setting new baseline to $newBaseline")
             baselineSteps = newBaseline
+            confirmedSteps = 0
+            provisionalExtra = 0
             onStepUpdate?.invoke(0)
         }
     }
