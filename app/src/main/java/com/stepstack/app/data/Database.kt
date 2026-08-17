@@ -50,6 +50,15 @@ data class StepEventEntity(
     val epochDay: Long
 )
 
+@Entity(tableName = "achievements")
+data class AchievementEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val description: String,
+    val icon: String,
+    val unlocked: Boolean
+)
+
 @Dao
 interface WorkoutDao {
     @Query("SELECT * FROM workouts")
@@ -63,6 +72,18 @@ interface WorkoutDao {
 
     @Query("DELETE FROM workouts WHERE id = :id")
     suspend fun deleteWorkout(id: String)
+}
+
+@Dao
+interface AchievementDao {
+    @Query("SELECT * FROM achievements")
+    suspend fun getAllAchievements(): List<AchievementEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAchievements(achievements: List<AchievementEntity>)
+
+    @Query("UPDATE achievements SET unlocked = :unlocked WHERE id = :id")
+    suspend fun updateUnlocked(id: String, unlocked: Boolean)
 }
 
 @Dao
@@ -119,14 +140,15 @@ class Converters {
 }
 
 @Database(
-    entities = [WorkoutEntity::class, WorkoutSessionEntity::class, DailyActivityEntity::class, StepEventEntity::class],
-    version = 3,
+    entities = [WorkoutEntity::class, WorkoutSessionEntity::class, DailyActivityEntity::class, StepEventEntity::class, AchievementEntity::class],
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun workoutDao(): WorkoutDao
     abstract fun activityDao(): ActivityDao
+    abstract fun achievementDao(): AchievementDao
 
     companion object {
         private var INSTANCE: AppDatabase? = null

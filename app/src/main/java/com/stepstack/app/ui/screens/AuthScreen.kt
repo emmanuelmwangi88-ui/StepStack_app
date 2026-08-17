@@ -30,9 +30,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
+import androidx.credentials.GetCredentialRequest
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.stepstack.app.R
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -51,13 +57,45 @@ fun AuthScreen(
     
     val scope = rememberCoroutineScope()
     val auth = FirebaseAuth.getInstance()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val credentialManager = CredentialManager.create(context)
+
+    fun handleGoogleSignIn() {
+        isLoading = true
+        val googleIdOption: GetGoogleIdOption = GetGoogleIdOption.Builder()
+            .setFilterByAuthorizedAccounts(false)
+            .setServerClientId(context.getString(R.string.default_web_client_id))
+            .build()
+
+        val request: GetCredentialRequest = GetCredentialRequest.Builder()
+            .addCredentialOption(googleIdOption)
+            .build()
+
+        scope.launch {
+            try {
+                val result = credentialManager.getCredential(context = context, request = request)
+                val credential = result.credential
+                
+                if (credential is com.google.android.libraries.identity.googleid.GoogleIdTokenCredential) {
+                    val firebaseCredential = GoogleAuthProvider.getCredential(credential.idToken, null)
+                    auth.signInWithCredential(firebaseCredential).await()
+                    onAuthSuccess()
+                }
+            } catch (e: Exception) {
+                errorMessage = "Google sign-in failed: ${e.localizedMessage}"
+            } finally {
+                isLoading = false
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (!showLoginForm) {
             // Landing UI
             LandingUI(
                 onLoginClick = { showLoginForm = true },
-                onGetStartedClick = onNavigateToOnboarding
+                onGetStartedClick = onNavigateToOnboarding,
+                onGoogleSignIn = { handleGoogleSignIn() }
             )
         } else {
             // Login Form UI (Distinct from Signup)
@@ -94,7 +132,7 @@ fun AuthScreen(
 }
 
 @Composable
-private fun LandingUI(onLoginClick: () -> Unit, onGetStartedClick: () -> Unit) {
+private fun LandingUI(onLoginClick: () -> Unit, onGetStartedClick: () -> Unit, onGoogleSignIn: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Hero Background
         Image(
@@ -123,10 +161,8 @@ private fun LandingUI(onLoginClick: () -> Unit, onGetStartedClick: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Bottom
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.stepminilogo),
-                contentDescription = null,
-                modifier = Modifier.size(80.dp).clip(CircleShape)
+            Box(
+                modifier = Modifier.size(80.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f))
             )
             
             Spacer(Modifier.height(16.dp))
@@ -175,7 +211,7 @@ private fun LandingUI(onLoginClick: () -> Unit, onGetStartedClick: () -> Unit) {
             Spacer(Modifier.height(16.dp))
             
             Button(
-                onClick = { /* Google Sign In Logic */ },
+                onClick = onGoogleSignIn,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
@@ -282,4 +318,12 @@ private fun LoginUI(
             }
         }
     }
+}
+@Preview(showBackground = true)
+@Composable
+fun AuthScreenPreview() {
+    AuthScreen(
+        onAuthSuccess = {},
+        onNavigateToOnboarding = {}
+    )
 }

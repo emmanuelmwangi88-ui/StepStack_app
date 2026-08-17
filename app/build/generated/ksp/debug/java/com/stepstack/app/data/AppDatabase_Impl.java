@@ -30,18 +30,21 @@ public final class AppDatabase_Impl extends AppDatabase {
 
   private volatile ActivityDao _activityDao;
 
+  private volatile AchievementDao _achievementDao;
+
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(3) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(4) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `workouts` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `category` TEXT NOT NULL, `difficulty` TEXT NOT NULL, `durationMin` INTEGER NOT NULL, `calories` INTEGER NOT NULL, `equipment` TEXT NOT NULL, `description` TEXT NOT NULL, `exercisesJson` TEXT NOT NULL, `isFavorite` INTEGER NOT NULL, `thumbnailUrl` TEXT NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `workout_sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `workoutId` TEXT NOT NULL, `workoutName` TEXT NOT NULL, `dateEpochDay` INTEGER NOT NULL, `durationActualMin` INTEGER NOT NULL, `completedPercent` INTEGER NOT NULL, `exercisesCompleted` INTEGER NOT NULL, `caloriesBurned` INTEGER NOT NULL, `startTimeMillis` INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `daily_activity` (`epochDay` INTEGER NOT NULL, `steps` INTEGER NOT NULL, `workoutMinutes` INTEGER NOT NULL, `goalForDay` INTEGER NOT NULL, `distanceMeters` INTEGER NOT NULL, `caloriesBurned` INTEGER NOT NULL, PRIMARY KEY(`epochDay`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `step_events` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `epochDay` INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `achievements` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT NOT NULL, `icon` TEXT NOT NULL, `unlocked` INTEGER NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3a6fc2b232a85311efa9d6f47f290738')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3cb7c40f85a69b66811b09c92ed71625')");
       }
 
       @Override
@@ -50,6 +53,7 @@ public final class AppDatabase_Impl extends AppDatabase {
         db.execSQL("DROP TABLE IF EXISTS `workout_sessions`");
         db.execSQL("DROP TABLE IF EXISTS `daily_activity`");
         db.execSQL("DROP TABLE IF EXISTS `step_events`");
+        db.execSQL("DROP TABLE IF EXISTS `achievements`");
         final List<? extends RoomDatabase.Callback> _callbacks = mCallbacks;
         if (_callbacks != null) {
           for (RoomDatabase.Callback _callback : _callbacks) {
@@ -162,9 +166,24 @@ public final class AppDatabase_Impl extends AppDatabase {
                   + " Expected:\n" + _infoStepEvents + "\n"
                   + " Found:\n" + _existingStepEvents);
         }
+        final HashMap<String, TableInfo.Column> _columnsAchievements = new HashMap<String, TableInfo.Column>(5);
+        _columnsAchievements.put("id", new TableInfo.Column("id", "TEXT", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAchievements.put("title", new TableInfo.Column("title", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAchievements.put("description", new TableInfo.Column("description", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAchievements.put("icon", new TableInfo.Column("icon", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAchievements.put("unlocked", new TableInfo.Column("unlocked", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysAchievements = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesAchievements = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoAchievements = new TableInfo("achievements", _columnsAchievements, _foreignKeysAchievements, _indicesAchievements);
+        final TableInfo _existingAchievements = TableInfo.read(db, "achievements");
+        if (!_infoAchievements.equals(_existingAchievements)) {
+          return new RoomOpenHelper.ValidationResult(false, "achievements(com.stepstack.app.data.AchievementEntity).\n"
+                  + " Expected:\n" + _infoAchievements + "\n"
+                  + " Found:\n" + _existingAchievements);
+        }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "3a6fc2b232a85311efa9d6f47f290738", "f731f6547a2e28ddc9ffd05aebd4c56c");
+    }, "3cb7c40f85a69b66811b09c92ed71625", "947d72d11969e802100241868e82f10b");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;
@@ -175,7 +194,7 @@ public final class AppDatabase_Impl extends AppDatabase {
   protected InvalidationTracker createInvalidationTracker() {
     final HashMap<String, String> _shadowTablesMap = new HashMap<String, String>(0);
     final HashMap<String, Set<String>> _viewTables = new HashMap<String, Set<String>>(0);
-    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "workouts","workout_sessions","daily_activity","step_events");
+    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "workouts","workout_sessions","daily_activity","step_events","achievements");
   }
 
   @Override
@@ -188,6 +207,7 @@ public final class AppDatabase_Impl extends AppDatabase {
       _db.execSQL("DELETE FROM `workout_sessions`");
       _db.execSQL("DELETE FROM `daily_activity`");
       _db.execSQL("DELETE FROM `step_events`");
+      _db.execSQL("DELETE FROM `achievements`");
       super.setTransactionSuccessful();
     } finally {
       super.endTransaction();
@@ -204,6 +224,7 @@ public final class AppDatabase_Impl extends AppDatabase {
     final HashMap<Class<?>, List<Class<?>>> _typeConvertersMap = new HashMap<Class<?>, List<Class<?>>>();
     _typeConvertersMap.put(WorkoutDao.class, WorkoutDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(ActivityDao.class, ActivityDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(AchievementDao.class, AchievementDao_Impl.getRequiredConverters());
     return _typeConvertersMap;
   }
 
@@ -246,6 +267,20 @@ public final class AppDatabase_Impl extends AppDatabase {
           _activityDao = new ActivityDao_Impl(this);
         }
         return _activityDao;
+      }
+    }
+  }
+
+  @Override
+  public AchievementDao achievementDao() {
+    if (_achievementDao != null) {
+      return _achievementDao;
+    } else {
+      synchronized(this) {
+        if(_achievementDao == null) {
+          _achievementDao = new AchievementDao_Impl(this);
+        }
+        return _achievementDao;
       }
     }
   }

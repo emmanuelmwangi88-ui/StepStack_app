@@ -19,7 +19,8 @@
         android:supportsRtl="true"
         android:icon="@mipmap/stepstacklogo"
         android:roundIcon="@mipmap/stepstacklogo_round"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:enableOnBackInvokedCallback="true">
 
         <activity
             android:name=".MainActivity"

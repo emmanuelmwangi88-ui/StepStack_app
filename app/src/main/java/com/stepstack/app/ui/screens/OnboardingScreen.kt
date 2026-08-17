@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -52,8 +53,13 @@ import androidx.compose.ui.text.input.VisualTransformation
 import com.stepstack.app.ui.theme.StepStackTheme
 
 @Composable
-fun OnboardingScreen(onComplete: (OnboardingDraft) -> Unit, onBackToAuth: () -> Unit) {
-    var step by remember { mutableStateOf(0) }
+fun OnboardingScreen(
+    onComplete: (OnboardingDraft) -> Unit,
+    onBackToAuth: () -> Unit,
+    onSkipAuth: (OnboardingDraft) -> Unit,
+    onNavigateToSignIn: () -> Unit
+) {
+    var step by remember { mutableIntStateOf(0) }
     var draft by remember { mutableStateOf(OnboardingDraft()) }
     val totalSteps = 7
 
@@ -67,7 +73,7 @@ fun OnboardingScreen(onComplete: (OnboardingDraft) -> Unit, onBackToAuth: () -> 
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (step > 0 && step < 6) {
+            if (step in 1..5) {
                 LinearProgressIndicator(
                     progress = { step.toFloat() / (totalSteps - 1) },
                     modifier = Modifier
@@ -95,9 +101,15 @@ fun OnboardingScreen(onComplete: (OnboardingDraft) -> Unit, onBackToAuth: () -> 
                     3 -> EquipmentStep(draft.equipment) { draft = draft.copy(equipment = it); step = 4 }
                     4 -> BiometricsStep(draft.weight, draft.height) { w, h -> draft = draft.copy(weight = w, height = h); step = 5 }
                     5 -> PermissionsStep(onNext = { step = 6 })
-                    6 -> CreateAccountStep(draft, onBack = onBackToAuth) { name, email ->
-                        onComplete(draft.copy(name = name, email = email))
-                    }
+                    6 -> CreateAccountStep(
+                        draft = draft,
+                        onBack = { step = 5 },
+                        onDone = { name, email ->
+                            onComplete(draft.copy(name = name, email = email))
+                        },
+                        onSkip = { onSkipAuth(draft.copy(name = "Guest User", email = "demo@stepstack.app")) },
+                        onSignIn = onNavigateToSignIn
+                    )
                 }
             }
         }
@@ -139,7 +151,6 @@ private fun BiometricsStep(initialWeight: Float, initialHeight: Float, onNext: (
 
 @Composable
 private fun WelcomeStep(onNext: () -> Unit) {
-    val primary = MaterialTheme.colorScheme.primary
     Column(
         Modifier
             .fillMaxSize()
@@ -154,13 +165,20 @@ private fun WelcomeStep(onNext: () -> Unit) {
                 .size(400.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.stepminilogo),
-                contentDescription = null,
+            // Logo space intentionally left blank as requested
+            Box(
                 modifier = Modifier
                     .size(300.dp)
                     .clip(CircleShape)
-            )
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.stepstacklogo),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+            }
         }
         Spacer(Modifier.height(10.dp))
         Text(
@@ -361,7 +379,13 @@ private fun PermissionCard(icon: androidx.compose.ui.graphics.vector.ImageVector
 }
 
 @Composable
-private fun CreateAccountStep(draft: OnboardingDraft, onBack: () -> Unit, onDone: (String, String) -> Unit) {
+private fun CreateAccountStep(
+    draft: OnboardingDraft,
+    onBack: () -> Unit,
+    onDone: (String, String) -> Unit,
+    onSkip: () -> Unit,
+    onSignIn: () -> Unit
+) {
     var name by remember { mutableStateOf(draft.name) }
     var email by remember { mutableStateOf(draft.email) }
     var password by remember { mutableStateOf("") }
@@ -394,14 +418,14 @@ private fun CreateAccountStep(draft: OnboardingDraft, onBack: () -> Unit, onDone
             textAlign = TextAlign.Center
         )
         Text(
-            "Last step! Let's secure your fitness data and start your journey.",
+            "Secure your fitness data or continue as a guest.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp)
         )
         
-        Spacer(Modifier.height(40.dp))
+        Spacer(Modifier.height(32.dp))
 
         OutlinedTextField(
             value = name,
@@ -454,7 +478,7 @@ private fun CreateAccountStep(draft: OnboardingDraft, onBack: () -> Unit, onDone
             )
         }
         
-        Spacer(Modifier.height(40.dp))
+        Spacer(Modifier.height(32.dp))
         
         Button(
             onClick = {
@@ -480,8 +504,7 @@ private fun CreateAccountStep(draft: OnboardingDraft, onBack: () -> Unit, onDone
             shape = RoundedCornerShape(16.dp),
             enabled = !isLoading,
             colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                containerColor = MaterialTheme.colorScheme.primary
             )
         ) {
             if (isLoading) {
@@ -491,14 +514,34 @@ private fun CreateAccountStep(draft: OnboardingDraft, onBack: () -> Unit, onDone
             }
         }
         
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedButton(
+            onClick = onSkip,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+        ) {
+            Text("Continue as Guest (Demo Mode)", fontWeight = FontWeight.SemiBold)
+        }
+
         Spacer(Modifier.height(24.dp))
         
-        Text(
-            "By continuing, you agree to our Terms of Service and Privacy Policy.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text("Already have an account? ", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Sign In",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable { onSignIn() }
+            )
+        }
         
         Spacer(Modifier.height(32.dp))
     }
@@ -524,6 +567,6 @@ fun PrimaryButton(text: String, onClick: () -> Unit) {
 @Composable
 fun PreviewOnboardingScreen() {
     StepStackTheme {
-        OnboardingScreen(onComplete = {}, onBackToAuth = {})
+        OnboardingScreen(onComplete = {}, onBackToAuth = {}, onSkipAuth = {}, onNavigateToSignIn = {})
     }
 }

@@ -223,7 +223,7 @@ fun StepsScreen(
                 val chartData = remember(viewMode, vm.activityHistory.size, vm.todayActivity.steps) {
                     when (viewMode) {
                         "Day" -> {
-                            val hourly = vm.dayHourlyActivity()
+                            val hourly = vm.dayHourlyActivity
                             val labels = List(24) { i -> 
                                 when {
                                     i == 0 -> "12a"
@@ -234,7 +234,7 @@ fun StepsScreen(
                                     else -> ""
                                 }
                             }
-                            Triple(hourly.map { it.toFloat() }, labels, ChartViewType.DAY)
+                            Triple(hourly.toList().map { it.toFloat() }, labels, ChartViewType.DAY)
                         }
                         "Week" -> {
                             val week = vm.weekActivities()

@@ -435,102 +435,76 @@ fun AchievementBadge(a: Achievement) {
     
     val color = if (a.unlocked) unlockedColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
     
-    Card(
-        modifier = Modifier.width(150.dp).height(200.dp),
-        shape = RoundedCornerShape(32.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (a.unlocked) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        ),
-        elevation = if (a.unlocked) CardDefaults.cardElevation(defaultElevation = 6.dp) else CardDefaults.cardElevation(0.dp),
-        border = if (a.unlocked) androidx.compose.foundation.BorderStroke(2.dp, Brush.verticalGradient(listOf(unlockedColor, unlockedColor.copy(alpha = 0.4f)))) else null
+    Column(
+        modifier = Modifier.width(100.dp).padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Column(
-            Modifier.padding(16.dp).fillMaxSize(), 
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(72.dp)
         ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(90.dp)) {
-                if (a.unlocked) {
-                    Surface(
-                        Modifier.size(70.dp).scale(1.4f),
-                        shape = CircleShape,
-                        color = unlockedColor.copy(alpha = 0.15f)
-                    ) {}
-                    Surface(
-                        Modifier.size(55.dp).scale(1.2f),
-                        shape = CircleShape,
-                        color = unlockedColor.copy(alpha = 0.1f)
-                    ) {}
+            // Glow effect for unlocked
+            if (a.unlocked) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(unlockedColor.copy(alpha = 0.3f), Color.Transparent)
+                        ),
+                        radius = size.minDimension / 1.2f
+                    )
                 }
-                
-                Surface(
-                    Modifier.size(64.dp), 
-                    shape = CircleShape, 
-                    color = if (a.unlocked) unlockedColor.copy(alpha = 0.2f) else Color.Transparent,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = when(a.icon) {
-                                "footprint" -> Icons.Default.DirectionsWalk
-                                "calendar" -> Icons.Default.CalendarToday
-                                "steps" -> Icons.Default.DirectionsRun
-                                "flame" -> Icons.Default.Whatshot
-                                "dumbbell" -> Icons.Default.FitnessCenter
-                                "trophy" -> Icons.Default.EmojiEvents
-                                "explore" -> Icons.Default.Explore
-                                "water_drop" -> Icons.Default.Opacity
-                                "wb_sunny" -> Icons.Default.WbSunny
-                                "bedtime" -> Icons.Default.Bedtime
-                                "trending_up" -> Icons.Default.TrendingUp
-                                "insights" -> Icons.Default.Insights
-                                else -> Icons.Default.EmojiEvents
-                            },
-                            contentDescription = null,
-                            tint = color,
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
-                }
-                
-                if (!a.unlocked) {
-                    Box(
-                        Modifier
-                            .size(26.dp)
-                            .align(Alignment.BottomEnd)
-                            .background(MaterialTheme.colorScheme.surface, CircleShape)
-                            .padding(4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            Icons.Default.Lock, 
-                            null, 
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
+            }
+
+            Surface(
+                modifier = Modifier.size(56.dp),
+                shape = CircleShape,
+                color = if (a.unlocked) unlockedColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                tonalElevation = if (a.unlocked) 6.dp else 0.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = when(a.icon) {
+                            "footprint" -> Icons.Default.DirectionsWalk
+                            "calendar" -> Icons.Default.CalendarToday
+                            "steps" -> Icons.Default.DirectionsRun
+                            "flame" -> Icons.Default.Whatshot
+                            "dumbbell" -> Icons.Default.FitnessCenter
+                            "trophy" -> Icons.Default.EmojiEvents
+                            "explore" -> Icons.Default.Explore
+                            "water_drop" -> Icons.Default.Opacity
+                            "wb_sunny" -> Icons.Default.WbSunny
+                            "bedtime" -> Icons.Default.Bedtime
+                            "trending_up" -> Icons.Default.TrendingUp
+                            "insights" -> Icons.Default.Insights
+                            else -> Icons.Default.EmojiEvents
+                        },
+                        contentDescription = null,
+                        tint = if (a.unlocked) Color.White else color.copy(alpha = 0.6f),
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
             }
             
-            Spacer(Modifier.height(12.dp))
-            Text(
-                a.title, 
-                style = MaterialTheme.typography.titleMedium, 
-                fontWeight = FontWeight.ExtraBold, 
-                maxLines = 1, 
-                textAlign = TextAlign.Center,
-                color = if (a.unlocked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                a.description, 
-                style = MaterialTheme.typography.bodySmall, 
-                color = MaterialTheme.colorScheme.onSurfaceVariant, 
-                maxLines = 2, 
-                textAlign = TextAlign.Center, 
-                lineHeight = 14.sp,
-                fontSize = 11.sp
-            )
+            if (!a.unlocked) {
+                Icon(
+                    Icons.Default.Lock,
+                    null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(14.dp).align(Alignment.BottomEnd)
+                )
+            }
         }
+        
+        Spacer(Modifier.height(4.dp))
+        Text(
+            a.title,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            textAlign = TextAlign.Center,
+            color = if (a.unlocked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -680,6 +654,7 @@ fun BarChart(
 ) {
     val actualBarColor = barColor ?: MaterialTheme.colorScheme.primary
     val maxVal = (values.maxOrNull() ?: 1f).coerceAtLeast(1f)
+    val isEmpty = values.all { it == 0f }
     
     val maxIndex = if (showExtremes) values.indices.maxByOrNull { values[it] } ?: -1 else -1
     val minIndex = if (showExtremes && values.any { it > 0 }) values.indices.filter { values[it] > 0 }.minByOrNull { values[it] } ?: -1 else -1
@@ -718,7 +693,7 @@ fun BarChart(
                     }
                     
                     values.forEachIndexed { i, v ->
-                        val frac = (v / maxVal).coerceIn(0.01f, 1f)
+                        val frac = if (isEmpty) 0.05f else (v / maxVal).coerceIn(0.01f, 1f)
                         val animated by animateFloatAsState(
                             targetValue = frac,
                             animationSpec = tween(

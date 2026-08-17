@@ -452,11 +452,11 @@ fun HomeScreen(
             
             Spacer(Modifier.height(16.dp))
             
-            val chartData = remember(chartType, dataType, vm.activityHistory, vm.todayActivity.steps) {
+            val chartData = remember(chartType, dataType, vm.activityHistory.size, vm.todayActivity.steps) {
                 val baseData = when(chartType) {
                     ChartViewType.DAY -> {
-                        val hourly = vm.dayHourlyActivity()
-                        val vals = hourly.map { it.toFloat() }
+                        val hourly = vm.dayHourlyActivity
+                        val vals = hourly.toList().map { it.toFloat() }
                         val lbls = List(24) { i -> 
                             when {
                                 i == 0 -> "12a"
