@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -161,6 +162,13 @@ private fun ManualWorkoutDialog(onDismiss: () -> Unit, onSave: (String, Int, Int
 private fun WorkoutSessionHistoryCard(session: WorkoutSession, onDelete: () -> Unit) {
     val date = LocalDate.ofEpochDay(session.dateEpochDay)
     val primary = MaterialTheme.colorScheme.primary
+    val context = LocalContext.current
+
+    val imageModel = remember(session.thumbnailUrl) {
+        val resId = context.resources.getIdentifier(session.thumbnailUrl, "drawable", context.packageName)
+        if (resId != 0) resId else if (session.thumbnailUrl.startsWith("http")) session.thumbnailUrl else null
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -171,13 +179,22 @@ private fun WorkoutSessionHistoryCard(session: WorkoutSession, onDelete: () -> U
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                color = primary.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.size(44.dp)
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(primary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.FitnessCenter, null, tint = primary, modifier = Modifier.size(20.dp))
+                if (imageModel != null) {
+                    coil3.compose.AsyncImage(
+                        model = imageModel,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                    )
+                } else {
+                    Icon(Icons.Default.FitnessCenter, null, tint = primary, modifier = Modifier.size(24.dp))
                 }
             }
             Spacer(Modifier.width(16.dp))

@@ -199,7 +199,11 @@ class AppViewModel : ViewModel() {
             db.activityDao().getAllSessions().let { saved ->
                 sessions.clear()
                 sessions.addAll(saved.map { 
-                    WorkoutSession(it.workoutId, it.workoutName, it.dateEpochDay, it.durationActualMin, it.completedPercent, it.exercisesCompleted, 0, 0, it.caloriesBurned, it.startTimeMillis)
+                    WorkoutSession(
+                        it.workoutId, it.workoutName, it.dateEpochDay, it.durationActualMin, 
+                        it.completedPercent, it.exercisesCompleted, 0, 0, it.caloriesBurned, 
+                        it.startTimeMillis, it.thumbnailUrl
+                    )
                 })
             }
             refreshHourlyActivity()
@@ -227,21 +231,19 @@ class AppViewModel : ViewModel() {
         // Real-time flow observation from service for "immediate" UI updates
         viewModelScope.launch {
             StepTrackerService.todaySteps.collect { steps ->
-                if (steps > 0) {
-                    val t = today
-                    val idx = activityHistory.indexOfFirst { it.epochDay == t }
-                    if (idx != -1) {
-                        if (activityHistory[idx].steps < steps) {
-                            activityHistory[idx] = activityHistory[idx].copy(steps = steps)
-                        }
-                    } else {
-                        ensureTodayActivity()
+                val t = today
+                val idx = activityHistory.indexOfFirst { it.epochDay == t }
+                if (idx != -1) {
+                    if (activityHistory[idx].steps < steps || (steps == 0 && activityHistory[idx].steps > 0)) {
+                        activityHistory[idx] = activityHistory[idx].copy(steps = steps)
                     }
-                    if (isWalking) {
-                        walkCurrentSteps = (steps - walkStartSteps).coerceAtLeast(0)
-                    }
-                    refreshHourlyActivity()
+                } else {
+                    ensureTodayActivity()
                 }
+                if (isWalking) {
+                    walkCurrentSteps = (steps - walkStartSteps).coerceAtLeast(0)
+                }
+                refreshHourlyActivity()
             }
         }
     }
@@ -598,7 +600,8 @@ class AppViewModel : ViewModel() {
                     dateEpochDay = session.dateEpochDay, durationActualMin = session.durationActualMin,
                     completedPercent = session.completedPercent, exercisesCompleted = session.exercisesCompleted,
                     caloriesBurned = session.caloriesBurned,
-                    startTimeMillis = session.startTimeMillis
+                    startTimeMillis = session.startTimeMillis,
+                    thumbnailUrl = session.thumbnailUrl
                 ))
                 FirebaseManager.saveWorkoutSession(session)
             }

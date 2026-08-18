@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.stepstack.app.data.DailyActivity
@@ -266,32 +265,27 @@ fun WorkoutSessionCard(
         ImageRequest.Builder(context)
             .data(imageModel)
             .crossfade(true)
-            .memoryCachePolicy(CachePolicy.ENABLED)
-            .diskCachePolicy(CachePolicy.ENABLED)
             .build()
     }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
         Column {
-            Box(modifier = Modifier.fillMaxWidth().height(160.dp)) { 
+            Box(modifier = Modifier.fillMaxWidth().height(170.dp)) { 
                 if (imageModel != null) {
                     AsyncImage(
                         model = imageRequest,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
-                        placeholder = androidx.compose.ui.graphics.painter.ColorPainter(MaterialTheme.colorScheme.surfaceVariant),
-                        error = androidx.compose.ui.graphics.painter.ColorPainter(primary.copy(alpha = 0.1f)),
-                        fallback = androidx.compose.ui.graphics.painter.ColorPainter(primary.copy(alpha = 0.1f))
+                        placeholder = androidx.compose.ui.graphics.painter.ColorPainter(MaterialTheme.colorScheme.surfaceVariant)
                     )
                 } else {
                     Box(
@@ -312,12 +306,13 @@ fun WorkoutSessionCard(
                     }
                 }
                 
+                // Dark gradient overlay for text readability
                 Box(
                     Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f)),
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
                                 startY = 300f
                             )
                         )
@@ -326,7 +321,7 @@ fun WorkoutSessionCard(
                 if (showFavorite) {
                     Surface(
                         modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
-                        color = Color.Black.copy(alpha = 0.3f),
+                        color = Color.Black.copy(alpha = 0.4f),
                         shape = CircleShape
                     ) {
                         IconButton(onClick = onFavoriteClick, modifier = Modifier.size(36.dp)) {
@@ -343,31 +338,32 @@ fun WorkoutSessionCard(
                 Row(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Surface(
                         color = primary,
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(10.dp)
                     ) {
                         Text(
                             workout.difficulty.label, 
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), 
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), 
                             style = MaterialTheme.typography.labelSmall, 
-                            fontWeight = FontWeight.Bold, 
+                            fontWeight = FontWeight.ExtraBold, 
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                     if (workout.equipment == com.stepstack.app.data.Equipment.NONE) {
                         Surface(
-                            color = Color.Black.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(8.dp)
+                            color = Color.Black.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(10.dp)
                         ) {
                             Text(
                                 "Bodyweight", 
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), 
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), 
                                 style = MaterialTheme.typography.labelSmall, 
-                                fontWeight = FontWeight.Bold, 
+                                fontWeight = FontWeight.ExtraBold, 
                                 color = Color.White
                             )
                         }
@@ -375,11 +371,11 @@ fun WorkoutSessionCard(
                 }
             }
             
-            Column(Modifier.padding(16.dp)) {
+            Column(Modifier.padding(20.dp)) {
                 Text(
                     workout.name, 
-                    style = MaterialTheme.typography.titleMedium, 
-                    fontWeight = FontWeight.Bold, 
+                    style = MaterialTheme.typography.titleLarge, 
+                    fontWeight = FontWeight.Black, 
                     maxLines = 1,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -388,27 +384,27 @@ fun WorkoutSessionCard(
                 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Timer, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(4.dp))
-                        Text("${workout.durationMin}m", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Default.Timer, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(6.dp))
+                        Text("${workout.durationMin}m", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.LocalFireDepartment, null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(4.dp))
-                        Text("${workout.calories} kcal", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(Icons.Default.LocalFireDepartment, null, modifier = Modifier.size(16.dp), tint = Coral500)
+                        Spacer(Modifier.width(6.dp))
+                        Text("${workout.calories} kcal", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
                     workout.description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    fontSize = 13.sp
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    maxLines = 2,
+                    lineHeight = 20.sp
                 )
             }
         }
