@@ -193,7 +193,8 @@ fun AppNavHost(
                                 completedPercent = 100,
                                 exercisesCompleted = s.exercisesCompleted,
                                 caloriesBurned = s.caloriesBurned,
-                                startTimeMillis = s.startTimeMillis
+                                startTimeMillis = s.startTimeMillis,
+                                thumbnailUrl = s.thumbnailUrl
                             )
                         )
                         navController.navigate(Route.Workouts.route) {

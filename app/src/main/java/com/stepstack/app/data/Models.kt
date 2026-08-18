@@ -168,7 +168,8 @@ data class WorkoutSession(
     val exercisesSkipped: Int = 0,
     val exercisesModified: Int = 0,
     val caloriesBurned: Int = 0,
-    val startTimeMillis: Long = System.currentTimeMillis()
+    val startTimeMillis: Long = System.currentTimeMillis(),
+    val thumbnailUrl: String = ""
 )
 
 @Serializable
@@ -239,7 +240,8 @@ data class WorkoutSummary(
     val durationMinutes: Int,
     val caloriesBurned: Int,
     val exercisesCompleted: Int,
-    val startTimeMillis: Long = System.currentTimeMillis()
+    val startTimeMillis: Long = System.currentTimeMillis(),
+    val thumbnailUrl: String = ""
 )
 
 @Serializable

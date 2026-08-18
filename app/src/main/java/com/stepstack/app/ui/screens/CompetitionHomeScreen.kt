@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,12 +28,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.stepstack.app.data.*
 import com.stepstack.app.util.CloudinaryManager
 import com.stepstack.app.viewmodel.AppViewModel
@@ -126,7 +129,7 @@ fun CompetitionHeader(vm: AppViewModel) {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             StatChip(label = "Today", value = vm.todayActivity.steps.toString(), modifier = Modifier.weight(1f))
-            StatChip(label = "Your rank", value = "#$myRank", modifier = Modifier.weight(1f))
+            StatChip(label = "Score", value = vm.todayActivity.movementScore.toString(), modifier = Modifier.weight(1f))
             StatChip(label = "Streak", value = "${vm.currentStreak}d", modifier = Modifier.weight(1f))
         }
     }
@@ -335,7 +338,10 @@ fun PodiumSpot(
     ) {
         Box(contentAlignment = Alignment.BottomEnd) {
             AsyncImage(
-                model = user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" },
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" })
+                    .crossfade(true)
+                    .build(),
                 contentDescription = null,
                 modifier = Modifier
                     .size(size)
@@ -441,7 +447,10 @@ fun TrailRow(
         Spacer(modifier = Modifier.width(12.dp))
 
         AsyncImage(
-            model = user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" },
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" })
+                .crossfade(true)
+                .build(),
             contentDescription = null,
             modifier = Modifier
                 .size(40.dp)
@@ -593,7 +602,10 @@ fun FlatFriendRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             AsyncImage(
-                model = user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" },
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" })
+                    .crossfade(true)
+                    .build(),
                 contentDescription = null,
                 modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
                 contentScale = ContentScale.Crop
@@ -777,85 +789,113 @@ fun ChallengeFlatCard(challenge: Challenge, onClick: () -> Unit) {
         0.4f // Placeholder 40%
     } else 0f
 
-    Column(
+    val displayImage = remember(challenge.id, challenge.imageUrl) {
+        if (challenge.imageUrl.isNotBlank()) challenge.imageUrl
+        else {
+            val photoIds = listOf(
+                "1552674605-db6ffd4facb5",
+                "1517836357463-d25dfeac3438",
+                "1534438327276-14e5300c3a48",
+                "1571019613454-1cb2f99b2d8b",
+                "1541534741688-6078c6bfb5c5",
+                "1526506118085-60ce8714f8c5",
+                "1517438984742-1262db08379e"
+            )
+            val photoId = photoIds[kotlin.math.abs(challenge.id.hashCode()) % photoIds.size]
+            "https://images.unsplash.com/photo-$photoId?q=80&w=2070&auto=format&fit=crop"
+        }
+    }
+
+    Card(
         modifier = Modifier
             .width(220.dp)
-            .clickable { onClick() }
+            .clickable { onClick() },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
-        Box {
-            AsyncImage(
-                model = challenge.imageUrl.ifBlank { "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=2070&auto=format&fit=crop" },
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(130.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentScale = ContentScale.Crop
-            )
-            
-            // Progress Gauge Overlay
-            if (challenge.dailyGoalTarget != null) {
-                Box(
+        Column {
+            Box {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(displayImage)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(8.dp)
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.Black.copy(alpha = 0.3f))
-                ) {
+                        .height(130.dp)
+                        .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentScale = ContentScale.Crop
+                )
+                
+                // Progress Gauge Overlay
+                if (challenge.dailyGoalTarget != null) {
                     Box(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(progress)
-                            .background(Color(0xFFFFB347))
-                    )
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(Color.Black.copy(alpha = 0.3f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(progress)
+                                .background(Color(0xFFFFB347))
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.padding(12.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Black.copy(alpha = 0.65f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (challenge.visibility == ChallengeVisibility.COMMUNITY) Icons.Default.Public else Icons.Default.Lock,
+                            null,
+                            modifier = Modifier.size(12.dp),
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            if (challenge.visibility == ChallengeVisibility.COMMUNITY) "Community" else "Friends",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
-            Surface(
-                modifier = Modifier.padding(10.dp),
-                shape = RoundedCornerShape(10.dp),
-                color = Color.Black.copy(alpha = 0.55f)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        if (challenge.visibility == ChallengeVisibility.COMMUNITY) Icons.Default.Public else Icons.Default.Lock,
-                        null,
-                        modifier = Modifier.size(12.dp),
-                        tint = Color.White
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        if (challenge.visibility == ChallengeVisibility.COMMUNITY) "Community" else "Friends",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    challenge.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
+                )
+
+                Spacer(Modifier.height(4.dp))
+
+                Text(
+                    "${challenge.dailyGoalTarget ?: "Race"} steps",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = StepDigits,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Text(
-            challenge.title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1
-        )
-
-        Text(
-            "${challenge.dailyGoalTarget ?: "Race"} steps",
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = StepDigits,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 

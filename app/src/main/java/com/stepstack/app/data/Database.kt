@@ -30,7 +30,8 @@ data class WorkoutSessionEntity(
     val completedPercent: Int,
     val exercisesCompleted: Int,
     val caloriesBurned: Int,
-    val startTimeMillis: Long = System.currentTimeMillis()
+    val startTimeMillis: Long = System.currentTimeMillis(),
+    val thumbnailUrl: String = ""
 )
 
 @Entity(tableName = "daily_activity")

@@ -18,14 +18,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import com.stepstack.app.data.*
 import com.stepstack.app.ui.theme.*
 import com.stepstack.app.viewmodel.AppViewModel
@@ -128,7 +132,10 @@ fun FriendProfileScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         AsyncImage(
-                            model = u.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${u.displayName}&background=random" },
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(u.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${u.displayName}&background=random" })
+                                .crossfade(true)
+                                .build(),
                             contentDescription = null,
                             modifier = Modifier
                                 .size(120.dp)
@@ -344,23 +351,38 @@ fun ModernAchievementItem(modifier: Modifier = Modifier, achievement: Achievemen
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Surface(
-            modifier = Modifier.size(70.dp),
-            shape = RoundedCornerShape(20.dp),
+            modifier = Modifier.size(80.dp),
+            shape = RoundedCornerShape(24.dp),
             color = DarkSurface,
-            border = BorderStroke(1.dp, DarkOutline)
+            border = BorderStroke(1.dp, if (achievement.unlocked) Amber500.copy(alpha = 0.5f) else DarkOutline),
+            tonalElevation = 2.dp
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(achievement.icon, fontSize = 32.sp)
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = if (achievement.unlocked) {
+                    Modifier.background(
+                        Brush.radialGradient(
+                            colors = listOf(Amber500.copy(alpha = 0.15f), Color.Transparent)
+                        )
+                    )
+                } else Modifier
+            ) {
+                Text(
+                    text = achievement.icon,
+                    fontSize = 36.sp,
+                    modifier = Modifier.alpha(if (achievement.unlocked) 1f else 0.3f)
+                )
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
             achievement.title,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            color = DarkOnSurface,
+            color = if (achievement.unlocked) DarkOnSurface else DarkOnSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            maxLines = 2
+            maxLines = 2,
+            lineHeight = 12.sp
         )
     }
 }
