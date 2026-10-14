@@ -7,6 +7,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.util.Log
+import java.time.LocalDate
 
 /**
  * Robust manager for hardware step sensors.
@@ -44,6 +45,11 @@ class StepCounterManager(context: Context) : SensorEventListener {
         get() = prefs.getInt("last_known_raw_value", -1)
         set(value) = prefs.edit().putInt("last_known_raw_value", value).apply()
 
+    /** Persisted epoch day for baseline tracking. */
+    private var baselineEpochDay: Long
+        get() = prefs.getLong("baseline_epoch_day", -1L)
+        set(value) = prefs.edit().putLong("baseline_epoch_day", value).apply()
+
     // Callbacks for the service/UI
     var onStepUpdate: ((Int) -> Unit)? = null      // Source of truth (today's total)
     var onStepDetected: (() -> Unit)? = null       // Instant event (one physical step)
@@ -68,6 +74,16 @@ class StepCounterManager(context: Context) : SensorEventListener {
         }
         if (!isStepDetectorAvailable) {
             Log.w("StepCounterManager", "Step Detector not available — instant feedback disabled, counter-only mode.")
+        }
+
+        // Check if a new calendar day has started since last tracking session.
+        val todayEpochDay = LocalDate.now().toEpochDay()
+        val savedEpochDay = baselineEpochDay
+        if (savedEpochDay != todayEpochDay) {
+            Log.i("StepCounterManager", "New day detected ($todayEpochDay vs $savedEpochDay). Resetting step baseline to 0.")
+            baselineSteps = -1
+            lastKnownRawValue = -1
+            baselineEpochDay = todayEpochDay
         }
 
         // Restore today's confirmed count from storage and push it immediately so the
@@ -131,8 +147,6 @@ class StepCounterManager(context: Context) : SensorEventListener {
         }
 
         // SANITY CHECK: guard against implausible single-event jumps.
-        // Instead of clamping the 'lastKnownRawValue' (which causes a catch-up loop as the sensor
-        // continues to report the large absolute value), we adjust the baseline to ignore the jump.
         if (previousRaw != -1) {
             val delta = currentRawValue - previousRaw
             if (delta > MAX_PLAUSIBLE_STEPS_PER_EVENT) {
@@ -146,6 +160,7 @@ class StepCounterManager(context: Context) : SensorEventListener {
 
         if (baselineSteps == -1) {
             baselineSteps = lastKnownRawValue
+            baselineEpochDay = LocalDate.now().toEpochDay()
         }
 
         val todaySteps = (lastKnownRawValue - baselineSteps).coerceAtLeast(0)
@@ -165,6 +180,7 @@ class StepCounterManager(context: Context) : SensorEventListener {
         if (newBaseline != -1) {
             Log.i("StepCounterManager", "Day rollover: Setting new baseline to $newBaseline")
             baselineSteps = newBaseline
+            baselineEpochDay = LocalDate.now().toEpochDay()
             confirmedSteps = 0
             provisionalExtra = 0
             onStepUpdate?.invoke(0)

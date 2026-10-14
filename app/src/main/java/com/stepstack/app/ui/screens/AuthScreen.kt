@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
@@ -46,7 +48,8 @@ import kotlinx.coroutines.tasks.await
 @Composable
 fun AuthScreen(
     onAuthSuccess: () -> Unit,
-    onNavigateToOnboarding: () -> Unit
+    onNavigateToOnboarding: () -> Unit,
+    savedProfilePhoto: String = ""
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -76,7 +79,7 @@ fun AuthScreen(
                 val result = credentialManager.getCredential(context = context, request = request)
                 val credential = result.credential
                 
-                if (credential is com.google.android.libraries.identity.googleid.GoogleIdTokenCredential) {
+                if (credential is GoogleIdTokenCredential) {
                     val firebaseCredential = GoogleAuthProvider.getCredential(credential.idToken, null)
                     auth.signInWithCredential(firebaseCredential).await()
                     onAuthSuccess()
@@ -93,6 +96,7 @@ fun AuthScreen(
         if (!showLoginForm) {
             // Landing UI
             LandingUI(
+                savedProfilePhoto = savedProfilePhoto,
                 onLoginClick = { showLoginForm = true },
                 onGetStartedClick = onNavigateToOnboarding,
                 onGoogleSignIn = { handleGoogleSignIn() }
@@ -100,6 +104,7 @@ fun AuthScreen(
         } else {
             // Login Form UI (Distinct from Signup)
             LoginUI(
+                savedProfilePhoto = savedProfilePhoto,
                 email = email,
                 onEmailChange = { email = it; errorMessage = null },
                 password = password,
@@ -132,7 +137,12 @@ fun AuthScreen(
 }
 
 @Composable
-private fun LandingUI(onLoginClick: () -> Unit, onGetStartedClick: () -> Unit, onGoogleSignIn: () -> Unit) {
+private fun LandingUI(
+    savedProfilePhoto: String = "",
+    onLoginClick: () -> Unit,
+    onGetStartedClick: () -> Unit,
+    onGoogleSignIn: () -> Unit
+) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Hero Background
         Image(
@@ -161,9 +171,31 @@ private fun LandingUI(onLoginClick: () -> Unit, onGetStartedClick: () -> Unit, o
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Bottom
         ) {
-            Box(
-                modifier = Modifier.size(80.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f))
-            )
+            if (savedProfilePhoto.isNotBlank()) {
+                Box(
+                    modifier = Modifier
+                        .size(88.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.25f))
+                        .padding(3.dp)
+                        .clip(CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AsyncImage(
+                        model = savedProfilePhoto,
+                        contentDescription = "Saved Profile Photo",
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            } else {
+                Box(
+                    modifier = Modifier.size(80.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                }
+            }
             
             Spacer(Modifier.height(16.dp))
             
@@ -228,6 +260,7 @@ private fun LandingUI(onLoginClick: () -> Unit, onGetStartedClick: () -> Unit, o
 
 @Composable
 private fun LoginUI(
+    savedProfilePhoto: String = "",
     email: String,
     onEmailChange: (String) -> Unit,
     password: String,
@@ -250,7 +283,28 @@ private fun LoginUI(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
         }
         
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
+        
+        if (savedProfilePhoto.isNotBlank()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .size(90.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                    .padding(3.dp)
+                    .clip(CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = savedProfilePhoto,
+                    contentDescription = "Saved Profile Photo",
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+        }
         
         Text(
             "Welcome Back",
@@ -273,6 +327,7 @@ private fun LoginUI(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
             leadingIcon = { Icon(Icons.Default.Email, null) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             singleLine = true
         )
         
@@ -290,6 +345,7 @@ private fun LoginUI(
                     Icon(if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, null)
                 }
             },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             singleLine = true
         )

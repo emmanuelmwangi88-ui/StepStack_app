@@ -27,9 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -41,7 +39,6 @@ import com.stepstack.app.data.ActivityLevel
 import com.stepstack.app.data.Equipment
 import com.stepstack.app.data.GoalType
 import com.stepstack.app.data.OnboardingDraft
-import com.stepstack.app.ui.theme.Teal600
 import com.stepstack.app.R
 import com.stepstack.app.ui.theme.Lime500
 import kotlinx.coroutines.launch
@@ -155,11 +152,11 @@ private fun WelcomeStep(onNext: () -> Unit) {
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top,
     ) {
-        Spacer(Modifier.height(48.dp))
+        Spacer(Modifier.height(8.dp))
         Box(
             Modifier
                 .size(400.dp),
@@ -180,14 +177,14 @@ private fun WelcomeStep(onNext: () -> Unit) {
                 )
             }
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             "Step Stack",
             style = MaterialTheme.typography.displayMedium, 
             fontWeight = FontWeight.Black,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             "Unified movement tracking.\nSteps + Workouts in one score.",
             style = MaterialTheme.typography.titleMedium,

@@ -7,14 +7,13 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.stepstack.app.service.watchdog.ServiceWatchdogWorker
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+        val action = intent.action
+        if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED || action == "com.stepstack.app.RESTART_TRACKER_SERVICE") {
             
-            // On Android 14+ (API 34), starting a foreground service of type 'health'
-            // requires the ACTIVITY_RECOGNITION permission. If not granted, starting
-            // the service will throw a SecurityException.
             val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
             } else true
@@ -24,7 +23,7 @@ class BootReceiver : BroadcastReceiver() {
                 return
             }
 
-            Log.i("BootReceiver", "Starting StepTrackerService after boot/update")
+            Log.i("BootReceiver", "Starting StepTrackerService (action=$action)")
             val serviceIntent = Intent(context, StepTrackerService::class.java)
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -32,6 +31,8 @@ class BootReceiver : BroadcastReceiver() {
                 } else {
                     context.startService(serviceIntent)
                 }
+                // Schedule watchdog as well
+                ServiceWatchdogWorker.schedule(context)
             } catch (e: Exception) {
                 Log.e("BootReceiver", "Failed to start StepTrackerService", e)
             }

@@ -106,7 +106,7 @@ class NotificationSystem(private val context: Context, private val vm: AppViewMo
     }
 
     fun scheduleDailyReminder(hour: Int, minute: Int) {
-        // Mock implementation for demo
+        DailyReminderWorker.schedule(context, hour, minute)
     }
 
     fun snoozeNotification(type: String) {

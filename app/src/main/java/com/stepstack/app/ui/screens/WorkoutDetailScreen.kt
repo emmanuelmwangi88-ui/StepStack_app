@@ -28,7 +28,6 @@ import coil3.request.crossfade
 import com.stepstack.app.data.Exercise
 import com.stepstack.app.data.ExerciseType
 import com.stepstack.app.data.Workout
-import com.stepstack.app.ui.components.LabelValue
 
 import androidx.compose.ui.tooling.preview.Preview
 import com.stepstack.app.data.SampleData

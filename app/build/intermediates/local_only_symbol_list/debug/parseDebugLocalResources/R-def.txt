@@ -31,6 +31,8 @@ mipmap stepstack
 mipmap stepstacklogo
 mipmap stepstacklogo_round
 string app_name
+string com.google.firebase.crashlytics.mapping_file_id
+string com.google.firebase.crashlytics.version_control_info
 string default_web_client_id
 string gcm_defaultSenderId
 string google_api_key

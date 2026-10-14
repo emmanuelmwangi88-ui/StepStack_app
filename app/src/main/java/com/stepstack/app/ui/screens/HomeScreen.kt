@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.outlined.Search
@@ -164,6 +163,24 @@ fun HomeScreen(
 
             Spacer(Modifier.height(16.dp))
 
+            if (!vm.isBatteryOptimizationIgnored) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    onClick = { vm.requestIgnoreBatteryOptimizations(context) }
+                ) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.BatteryAlert, null, tint = MaterialTheme.colorScheme.error)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Accuracy Warning", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                            Text("Battery optimization may kill step tracking. Tap to fix.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                        }
+                    }
+                }
+            }
+
             // Unified Score Ring
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -317,8 +334,22 @@ fun HomeScreen(
                             Text("Hydration", style = MaterialTheme.typography.labelSmall)
                             Text("${vm.waterIntake.intValue}/${vm.waterTarget}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
-                        IconButton(onClick = { vm.addWater(context) }, modifier = Modifier.size(32.dp).background(Color(0xFF42A5F5).copy(alpha = 0.1f), CircleShape)) {
-                            Icon(Icons.Outlined.WaterDrop, null, tint = Color(0xFF42A5F5), modifier = Modifier.size(16.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (vm.waterIntake.intValue > 0) {
+                                IconButton(
+                                    onClick = { vm.removeWater(context) },
+                                    modifier = Modifier.size(28.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                                ) {
+                                    Icon(Icons.Default.Remove, "Remove glass", modifier = Modifier.size(14.dp))
+                                }
+                                Spacer(Modifier.width(4.dp))
+                            }
+                            IconButton(
+                                onClick = { vm.addWater(context) },
+                                modifier = Modifier.size(32.dp).background(Color(0xFF42A5F5).copy(alpha = 0.1f), CircleShape)
+                            ) {
+                                Icon(Icons.Outlined.WaterDrop, "Add glass", tint = Color(0xFF42A5F5), modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                 }
