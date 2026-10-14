@@ -4,34 +4,41 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -41,10 +48,15 @@ import com.stepstack.app.data.*
 import com.stepstack.app.util.CloudinaryManager
 import com.stepstack.app.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
+import java.text.NumberFormat
+import java.util.Locale
+import kotlin.math.abs
 
-// A monospace family gives step counts a pedometer / digital-readout feel,
-// distinct from the rest of the UI's humanist sans.
 private val StepDigits = FontFamily.Monospace
+
+private fun formatNumber(num: Int): String {
+    return NumberFormat.getNumberInstance(Locale.US).format(num)
+}
 
 @Composable
 fun CompetitionHomeScreen(
@@ -81,76 +93,174 @@ fun CompetitionHomeScreen(
 
 @Composable
 fun CompetitionHeader(vm: AppViewModel) {
-    val myRank = remember(vm.allUsers.size, vm.todayActivity.steps) {
-        val all = (vm.allUsers.map { it.lastSyncedStepCount } + vm.todayActivity.steps).distinct().sortedDescending()
-        val r = all.indexOf(vm.todayActivity.steps) + 1
-        if (r == 0) 1 else r
+    val scope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    val currentUid = FirebaseManager.userId ?: "demo_me"
+    val leaderboardUsers = remember(vm.allUsers.toList(), vm.todayActivity.steps) {
+        val list = vm.allUsers.toMutableList()
+        val index = list.indexOfFirst { it.uid == currentUid }
+        if (index >= 0) {
+            val existing = list[index]
+            list[index] = existing.copy(
+                displayName = vm.user.name.ifBlank { existing.displayName },
+                lastSyncedStepCount = maxOf(existing.lastSyncedStepCount, vm.todayActivity.steps)
+            )
+        } else {
+            list.add(
+                FirestoreUser(
+                    uid = currentUid,
+                    displayName = vm.user.name.ifBlank { "You" },
+                    username = vm.user.email.split("@").firstOrNull() ?: "athlete",
+                    avatarUrl = vm.user.photoUrl,
+                    lastSyncedStepCount = vm.todayActivity.steps
+                )
+            )
+        }
+        list.sortedByDescending { it.lastSyncedStepCount }
     }
 
-    Column(modifier = Modifier.padding(24.dp, 28.dp, 24.dp, 16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text(
-                    "Competition hub",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFFFFB347)
-                )
-                Text(
-                    if (vm.currentStreak > 0) "Day ${vm.currentStreak} of your streak" else "Start today's streak",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = CircleShape,
-                color = Color(0xFFFFF3E0)
+    val myRank = remember(leaderboardUsers, currentUid) {
+        val r = leaderboardUsers.indexOfFirst { it.uid == currentUid } + 1
+        if (r <= 0) 1 else r
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.LocalFireDepartment,
-                        contentDescription = "Streak",
-                        modifier = Modifier.size(24.dp),
-                        tint = Color(0xFFEF6C00)
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFFFFB347).copy(alpha = 0.15f),
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.EmojiEvents,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFF9800),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Leaderboard & Hub",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        if (vm.currentStreak > 0) "🔥 ${vm.currentStreak} day streak" else "Start today's streak",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+
+                IconButton(
+                    onClick = {
+                        isRefreshing = true
+                        scope.launch {
+                            vm.refreshCompetitionData()
+                            isRefreshing = false
+                        }
+                    },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    if (isRefreshing) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Refresh Leaderboard",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StatChip(label = "Today", value = vm.todayActivity.steps.toString(), modifier = Modifier.weight(1f))
-            StatChip(label = "Score", value = vm.todayActivity.movementScore.toString(), modifier = Modifier.weight(1f))
-            StatChip(label = "Streak", value = "${vm.currentStreak}d", modifier = Modifier.weight(1f))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatChip(
+                    label = "Your Rank",
+                    value = "#$myRank",
+                    icon = Icons.Default.Leaderboard,
+                    color = Color(0xFFFFB347),
+                    modifier = Modifier.weight(1f)
+                )
+                StatChip(
+                    label = "Today's Steps",
+                    value = formatNumber(vm.todayActivity.steps),
+                    icon = Icons.AutoMirrored.Filled.DirectionsWalk,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                StatChip(
+                    label = "Streak",
+                    value = "${vm.currentStreak}d",
+                    icon = Icons.Default.LocalFireDepartment,
+                    color = Color(0xFFFF5722),
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }
 
 @Composable
-fun StatChip(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            .padding(12.dp, 10.dp)
+fun StatChip(label: String, value: String, icon: ImageVector, color: Color, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(
-            value,
-            style = MaterialTheme.typography.titleMedium,
-            fontFamily = StepDigits,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                value,
+                style = MaterialTheme.typography.titleMedium,
+                fontFamily = StepDigits,
+                fontWeight = FontWeight.Black,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
+        }
     }
 }
 
@@ -159,28 +269,42 @@ fun SegmentedTabs(tabs: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .clip(RoundedCornerShape(14.dp))
+            .padding(horizontal = 20.dp)
+            .clip(RoundedCornerShape(18.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            .padding(3.dp)
+            .padding(4.dp)
     ) {
         tabs.forEachIndexed { index, title ->
             val isSelected = selected == index
+            val icon = when (index) {
+                0 -> Icons.Default.EmojiEvents
+                1 -> Icons.Default.Group
+                else -> Icons.Default.FlashOn
+            }
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(11.dp))
+                    .clip(RoundedCornerShape(14.dp))
                     .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
                     .clickable { onSelect(index) }
                     .padding(vertical = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
@@ -190,60 +314,65 @@ fun SegmentedTabs(tabs: List<String>, selected: Int, onSelect: (Int) -> Unit) {
 @Composable
 fun LeaderboardTab(vm: AppViewModel, onOpenFriend: (String) -> Unit) {
     val scope = rememberCoroutineScope()
-    val me = FirebaseManager.userId?.let { uid ->
+    val currentUid = FirebaseManager.userId ?: "demo_me"
+
+    val me = remember(vm.user.name, vm.user.email, vm.user.photoUrl, vm.todayActivity.steps) {
         FirestoreUser(
-            uid = uid,
-            displayName = vm.user.name,
-            username = vm.user.email.split("@").firstOrNull() ?: "me",
+            uid = currentUid,
+            displayName = vm.user.name.ifBlank { "You" },
+            username = vm.user.email.split("@").firstOrNull()?.ifBlank { "athlete" } ?: "athlete",
             avatarUrl = vm.user.photoUrl,
-            lastSyncedStepCount = vm.todayActivity.steps
+            lastSyncedStepCount = vm.todayActivity.steps,
+            lastSyncedAt = System.currentTimeMillis()
         )
     }
 
-    val leaderboardUsers = remember(vm.allUsers.size, vm.todayActivity.steps) {
-        (vm.allUsers + listOfNotNull(me))
-            .distinctBy { it.uid }
-            .sortedByDescending { it.lastSyncedStepCount }
-    }
-
-    if (vm.isFriendsLoading && leaderboardUsers.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+    val leaderboardUsers = remember(vm.allUsers.toList(), vm.todayActivity.steps, me) {
+        val list = vm.allUsers.toMutableList()
+        val index = list.indexOfFirst { it.uid == currentUid }
+        if (index >= 0) {
+            val existing = list[index]
+            list[index] = existing.copy(
+                displayName = vm.user.name.ifBlank { existing.displayName },
+                avatarUrl = vm.user.photoUrl.ifBlank { existing.avatarUrl },
+                lastSyncedStepCount = maxOf(existing.lastSyncedStepCount, vm.todayActivity.steps)
+            )
+        } else {
+            list.add(me)
         }
-    } else if (leaderboardUsers.isEmpty()) {
-        EmptyState(
-            icon = Icons.Default.EmojiEvents,
-            title = "No one on the board yet",
-            body = "Sign in to start comparing today's steps with others.",
-        )
-    } else {
-        val podium = leaderboardUsers.take(3)
-        val rest = leaderboardUsers.drop(3)
+        list.sortedByDescending { it.lastSyncedStepCount }
+    }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 16.dp)
-        ) {
-            item {
-                PodiumRow(
-                    podium = podium, 
-                    myUid = FirebaseManager.userId, 
-                    friends = vm.friends,
-                    onAddFriend = { uid ->
-                        scope.launch {
-                            FirebaseManager.sendFriendRequest(uid)
-                            vm.refreshCompetitionData()
-                        }
-                    },
-                    onOpenFriend = onOpenFriend
-                )
+    val topLeaderSteps = leaderboardUsers.firstOrNull()?.lastSyncedStepCount ?: 1
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (vm.isFriendsLoading && leaderboardUsers.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(12.dp))
+                    Text("Loading live scores...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-            if (rest.isNotEmpty()) {
-                item { 
-                    TrailedRows(
-                        users = rest, 
-                        startRank = 4, 
-                        myUid = FirebaseManager.userId, 
+        } else if (leaderboardUsers.isEmpty()) {
+            EmptyState(
+                icon = Icons.Default.EmojiEvents,
+                title = "No racers on the board yet",
+                body = "Sign in and log your daily steps to compete on the global leaderboard.",
+            )
+        } else {
+            val podium = leaderboardUsers.take(3)
+            val rest = leaderboardUsers.drop(3)
+            val myRank = leaderboardUsers.indexOfFirst { it.uid == currentUid } + 1
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 96.dp)
+            ) {
+                item {
+                    PodiumSection(
+                        podium = podium,
+                        myUid = currentUid,
                         friends = vm.friends,
                         onAddFriend = { uid ->
                             scope.launch {
@@ -252,7 +381,99 @@ fun LeaderboardTab(vm: AppViewModel, onOpenFriend: (String) -> Unit) {
                             }
                         },
                         onOpenFriend = onOpenFriend
-                    ) 
+                    )
+                }
+
+                if (rest.isNotEmpty()) {
+                    item {
+                        Text(
+                            "Leaderboard Rankings",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        )
+                    }
+
+                    itemsIndexed(rest) { index, user ->
+                        val rank = index + 4
+                        val isMe = user.uid == currentUid
+                        val isFriend = vm.friends.any { it.uid == user.uid }
+
+                        LeaderboardRow(
+                            user = user,
+                            rank = rank,
+                            isMe = isMe,
+                            isFriend = isFriend,
+                            topLeaderSteps = topLeaderSteps,
+                            onAddFriend = {
+                                scope.launch {
+                                    FirebaseManager.sendFriendRequest(user.uid)
+                                    vm.refreshCompetitionData()
+                                }
+                            },
+                            onClick = { onOpenFriend(user.uid) }
+                        )
+                    }
+                }
+            }
+
+            // Floating "My Position" Banner
+            if (myRank > 0) {
+                val myUser = leaderboardUsers.firstOrNull { it.uid == currentUid } ?: me
+                val topUser = leaderboardUsers.firstOrNull()
+                val gapToLeader = if (topUser != null) (topUser.lastSyncedStepCount - myUser.lastSyncedStepCount).coerceAtLeast(0) else 0
+
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shadowElevation = 8.dp,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("#$myRank", fontWeight = FontWeight.Black, color = Color.White, fontSize = 14.sp)
+                                }
+                            }
+
+                            Spacer(Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    "Your Position (#$myRank)",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Text(
+                                    if (myRank == 1) "👑 You are leading today's race!" else "🔥 ${formatNumber(gapToLeader)} steps behind #1",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+
+                        Text(
+                            formatNumber(myUser.lastSyncedStepCount),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontFamily = StepDigits,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -260,9 +481,9 @@ fun LeaderboardTab(vm: AppViewModel, onOpenFriend: (String) -> Unit) {
 }
 
 @Composable
-fun PodiumRow(
-    podium: List<FirestoreUser>, 
-    myUid: String?, 
+fun PodiumSection(
+    podium: List<FirestoreUser>,
+    myUid: String,
     friends: List<FirestoreUser>,
     onAddFriend: (String) -> Unit,
     onOpenFriend: (String) -> Unit
@@ -271,223 +492,328 @@ fun PodiumRow(
     val second = podium.getOrNull(1)
     val third = podium.getOrNull(2)
 
-    Row(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 20.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.Bottom
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
-        second?.let { 
-            PodiumSpot(
-                user = it, 
-                place = 2, 
-                size = 56.dp, 
-                myUid = myUid, 
-                isFriend = friends.any { f -> f.uid == it.uid },
-                onAddFriend = { onAddFriend(it.uid) },
-                onClick = { onOpenFriend(it.uid) }
-            ) 
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        first?.let { 
-            PodiumSpot(
-                user = it, 
-                place = 1, 
-                size = 76.dp, 
-                myUid = myUid, 
-                isFriend = friends.any { f -> f.uid == it.uid },
-                onAddFriend = { onAddFriend(it.uid) },
-                onClick = { onOpenFriend(it.uid) }
-            ) 
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        third?.let { 
-            PodiumSpot(
-                user = it, 
-                place = 3, 
-                size = 52.dp, 
-                myUid = myUid, 
-                isFriend = friends.any { f -> f.uid == it.uid },
-                onAddFriend = { onAddFriend(it.uid) },
-                onClick = { onOpenFriend(it.uid) }
-            ) 
+        Column(
+            modifier = Modifier.padding(vertical = 20.dp, horizontal = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = Color(0xFFFFB347), modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Daily Top Racers", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                // 2nd Place
+                second?.let {
+                    PodiumSpot(
+                        user = it,
+                        rank = 2,
+                        avatarSize = 64.dp,
+                        badgeColor = Color(0xFFC0C0C0),
+                        medal = "🥈",
+                        myUid = myUid,
+                        isFriend = friends.any { f -> f.uid == it.uid },
+                        onAddFriend = { onAddFriend(it.uid) },
+                        onClick = { onOpenFriend(it.uid) },
+                        modifier = Modifier.weight(1f)
+                    )
+                } ?: Spacer(Modifier.weight(1f))
+
+                // 1st Place (Center - Elevated)
+                first?.let {
+                    PodiumSpot(
+                        user = it,
+                        rank = 1,
+                        avatarSize = 80.dp,
+                        badgeColor = Color(0xFFFFD700),
+                        medal = "👑",
+                        myUid = myUid,
+                        isFriend = friends.any { f -> f.uid == it.uid },
+                        onAddFriend = { onAddFriend(it.uid) },
+                        onClick = { onOpenFriend(it.uid) },
+                        modifier = Modifier.weight(1.1f)
+                    )
+                } ?: Spacer(Modifier.weight(1.1f))
+
+                // 3rd Place
+                third?.let {
+                    PodiumSpot(
+                        user = it,
+                        rank = 3,
+                        avatarSize = 60.dp,
+                        badgeColor = Color(0xFFCD7F32),
+                        medal = "🥉",
+                        myUid = myUid,
+                        isFriend = friends.any { f -> f.uid == it.uid },
+                        onAddFriend = { onAddFriend(it.uid) },
+                        onClick = { onOpenFriend(it.uid) },
+                        modifier = Modifier.weight(1f)
+                    )
+                } ?: Spacer(Modifier.weight(1f))
+            }
         }
     }
 }
 
 @Composable
 fun PodiumSpot(
-    user: FirestoreUser, 
-    place: Int, 
-    size: androidx.compose.ui.unit.Dp, 
-    myUid: String?, 
+    user: FirestoreUser,
+    rank: Int,
+    avatarSize: Dp,
+    badgeColor: Color,
+    medal: String,
+    myUid: String,
     isFriend: Boolean,
     onAddFriend: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val isMe = user.uid == myUid
-    val medal = when (place) {
-        1 -> "🥇"
-        2 -> "🥈"
-        else -> "🥉"
-    }
+
     Column(
-        modifier = Modifier.clickable { onClick() },
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable { onClick() }
+            .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(contentAlignment = Alignment.BottomEnd) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" })
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
+        Box(contentAlignment = Alignment.TopCenter) {
+            Box(
                 modifier = Modifier
-                    .size(size)
+                    .size(avatarSize + 8.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentScale = ContentScale.Crop
-            )
-            Text(medal, fontSize = if (place == 1) 22.sp else 18.sp)
+                    .background(
+                        Brush.sweepGradient(
+                            listOf(badgeColor, badgeColor.copy(alpha = 0.5f), badgeColor)
+                        )
+                    )
+                    .padding(4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" })
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(avatarSize)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentScale = ContentScale.Crop
+                )
+            }
+
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset(y = 10.dp),
+                shape = CircleShape,
+                color = badgeColor,
+                shadowElevation = 4.dp
+            ) {
+                Text(
+                    text = "$medal #$rank",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Black,
+                    color = Color.Black,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
         }
-        Spacer(modifier = Modifier.height(6.dp))
+
+        Spacer(modifier = Modifier.height(14.dp))
+
         Text(
             if (isMe) "You" else user.displayName,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Bold,
-            color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
+            color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
+
         Text(
-            user.lastSyncedStepCount.toString(),
-            style = MaterialTheme.typography.labelSmall,
+            formatNumber(user.lastSyncedStepCount),
+            style = MaterialTheme.typography.labelMedium,
             fontFamily = StepDigits,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            fontWeight = FontWeight.ExtraBold,
+            color = badgeColor
         )
-        
+
         if (!isMe && !isFriend) {
             Spacer(Modifier.height(4.dp))
-            Button(
-                onClick = { onAddFriend() },
-                modifier = Modifier.height(28.dp),
-                shape = RoundedCornerShape(14.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.clickable { onAddFriend() }
             ) {
-                Icon(Icons.Default.PersonAdd, null, modifier = Modifier.size(12.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Add", fontSize = 10.sp)
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.PersonAdd, null, modifier = Modifier.size(10.dp), tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(3.dp))
+                    Text("Add", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
             }
         }
     }
 }
 
 @Composable
-fun TrailedRows(
-    users: List<FirestoreUser>, 
-    startRank: Int, 
-    myUid: String?, 
-    friends: List<FirestoreUser>,
-    onAddFriend: (String) -> Unit,
-    onOpenFriend: (String) -> Unit
-) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Canvas(modifier = Modifier
-            .fillMaxHeight()
-            .width(2.dp)
-            .padding(start = 39.dp)) {
-            drawLine(
-                color = Color.Gray.copy(alpha = 0.35f),
-                start = Offset(0f, 0f),
-                end = Offset(0f, size.height),
-                strokeWidth = 4f,
-                cap = StrokeCap.Round,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(2f, 14f), 0f)
-            )
-        }
-        Column {
-            users.forEachIndexed { index, user ->
-                val isFriend = friends.any { it.uid == user.uid }
-                TrailRow(
-                    user = user,
-                    rank = startRank + index,
-                    isMe = user.uid == myUid,
-                    isFriend = isFriend,
-                    onAddFriend = { onAddFriend(user.uid) },
-                    onClick = { onOpenFriend(user.uid) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun TrailRow(
-    user: FirestoreUser, 
-    rank: Int, 
-    isMe: Boolean, 
+fun LeaderboardRow(
+    user: FirestoreUser,
+    rank: Int,
+    isMe: Boolean,
     isFriend: Boolean,
+    topLeaderSteps: Int,
     onAddFriend: () -> Unit,
     onClick: () -> Unit
 ) {
-    Row(
+    val progress = (user.lastSyncedStepCount.toFloat() / topLeaderSteps.toFloat().coerceAtLeast(1f)).coerceIn(0.05f, 1f)
+
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
-            .background(if (isMe) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f) else Color.Transparent)
-            .padding(24.dp, 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier.width(32.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("#$rank", fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-        }
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" })
-                .crossfade(true)
-                .build(),
-            contentDescription = null,
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentScale = ContentScale.Crop
+            .padding(horizontal = 20.dp, vertical = 4.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isMe) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
         )
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            "#$rank",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Black,
+                            color = if (isMe) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
 
-        Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = if (isMe) "You" else user.displayName,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
-            )
-            Text(
-                text = "@${user.username}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" })
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentScale = ContentScale.Crop
+                )
 
-        if (!isMe && !isFriend) {
-            IconButton(onClick = onAddFriend) {
-                Icon(Icons.Default.PersonAdd, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (isMe) "You" else user.displayName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (isMe) {
+                            Spacer(Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            ) {
+                                Text(
+                                    "YOU",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        text = "@${user.username}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                if (!isMe && !isFriend) {
+                    IconButton(onClick = onAddFriend, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Default.PersonAdd, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                Text(
+                    text = formatNumber(user.lastSyncedStepCount),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontFamily = StepDigits,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Relative Step Progress Bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress)
+                        .clip(CircleShape)
+                        .background(
+                            if (isMe) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
+                        )
+                )
             }
         }
-
-        Text(
-            text = user.lastSyncedStepCount.toString(),
-            style = MaterialTheme.typography.titleMedium,
-            fontFamily = StepDigits,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.primary
-        )
     }
 }
 
@@ -503,7 +829,7 @@ fun FriendsTab(vm: AppViewModel, onOpenFriend: (String) -> Unit) {
             value = searchQuery,
             onValueChange = {
                 searchQuery = it
-                if (it.length >= 3) {
+                if (it.length >= 2) {
                     isSearching = true
                     scope.launch {
                         searchResults = FirebaseManager.searchUsers(it)
@@ -511,11 +837,19 @@ fun FriendsTab(vm: AppViewModel, onOpenFriend: (String) -> Unit) {
                     }
                 }
             },
-            modifier = Modifier.fillMaxWidth().padding(24.dp, 8.dp),
-            placeholder = { Text("Search by username") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp, 8.dp),
+            placeholder = { Text("Search runners by username...") },
             leadingIcon = { Icon(Icons.Default.Search, null) },
-            trailingIcon = { if (isSearching) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp) },
-            shape = RoundedCornerShape(16.dp),
+            trailingIcon = {
+                if (isSearching) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                else if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Clear, null) }
+                }
+            },
+            shape = RoundedCornerShape(18.dp),
+            singleLine = true,
             colors = TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
@@ -524,32 +858,35 @@ fun FriendsTab(vm: AppViewModel, onOpenFriend: (String) -> Unit) {
             )
         )
 
-        if (searchQuery.length >= 3) {
-            SectionLabel("Search results")
+        if (searchQuery.length >= 2) {
+            SectionLabel("Search Results")
             if (!isSearching && searchResults.isEmpty()) {
                 EmptyState(
                     icon = Icons.Default.PersonSearch,
-                    title = "No matches",
-                    body = "Try a different username."
+                    title = "No users found",
+                    body = "Try searching with a different username."
                 )
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(searchResults) { user ->
                         val isFriend = vm.friends.any { it.uid == user.uid }
                         FlatFriendRow(
-                            user = user, 
+                            user = user,
                             isFriend = isFriend,
                             onAction = {
-                                scope.launch { FirebaseManager.sendFriendRequest(user.uid) }
-                            }, 
-                            actionLabel = if (isFriend) "Friends" else "Add", 
+                                scope.launch {
+                                    FirebaseManager.sendFriendRequest(user.uid)
+                                    vm.refreshCompetitionData()
+                                }
+                            },
+                            actionLabel = if (isFriend) "Friends" else "Add Friend",
                             onClick = { onOpenFriend(user.uid) }
                         )
                     }
                 }
             }
         } else {
-            SectionLabel("My friends")
+            SectionLabel("My Walking Buddies")
             if (vm.isFriendsLoading && vm.friends.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -558,19 +895,19 @@ fun FriendsTab(vm: AppViewModel, onOpenFriend: (String) -> Unit) {
                 EmptyState(
                     icon = Icons.Default.GroupAdd,
                     title = "Walk with friends",
-                    body = "Search a username above to add your first friend and start comparing steps."
+                    body = "Search for users above to add your first friend and compare daily step scores."
                 )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 16.dp)
+                    contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                     items(vm.friends) { friend ->
                         FlatFriendRow(
                             user = friend,
                             isFriend = true,
-                            onAction = { /* Challenge? */ },
-                            actionLabel = "Challenge",
+                            onAction = { onOpenFriend(friend.uid) },
+                            actionLabel = "View Profile",
                             onClick = { onOpenFriend(friend.uid) }
                         )
                     }
@@ -582,20 +919,21 @@ fun FriendsTab(vm: AppViewModel, onOpenFriend: (String) -> Unit) {
 
 @Composable
 fun FlatFriendRow(
-    user: FirestoreUser, 
+    user: FirestoreUser,
     isFriend: Boolean,
-    onAction: () -> Unit, 
-    actionLabel: String, 
+    onAction: () -> Unit,
+    actionLabel: String,
     onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .padding(horizontal = 20.dp, vertical = 6.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -607,37 +945,42 @@ fun FlatFriendRow(
                     .crossfade(true)
                     .build(),
                 contentDescription = null,
-                modifier = Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentScale = ContentScale.Crop
             )
+
             Spacer(modifier = Modifier.width(16.dp))
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(user.displayName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                 Text("@${user.username}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                
+
                 Spacer(Modifier.height(4.dp))
-                
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.DirectionsWalk, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                    Icon(Icons.AutoMirrored.Filled.DirectionsWalk, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        "${user.lastSyncedStepCount} steps",
+                        "${formatNumber(user.lastSyncedStepCount)} steps",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
+
             Button(
                 onClick = onAction,
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 modifier = Modifier.height(36.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isFriend && actionLabel != "Challenge") Color.Transparent else MaterialTheme.colorScheme.primaryContainer,
+                    containerColor = if (isFriend && actionLabel != "Challenge") MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.primary
-                ),
-                border = if (isFriend && actionLabel != "Challenge") androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
+                )
             ) {
                 Text(actionLabel, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
@@ -648,16 +991,36 @@ fun FlatFriendRow(
 @Composable
 fun ChallengesTab(vm: AppViewModel, onOpenChallenge: (String) -> Unit) {
     var showCreate by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedFilterChip by remember { mutableStateOf("All") }
 
-    val communityChallenges = vm.activeChallenges.filter { it.visibility == ChallengeVisibility.COMMUNITY }
-    val friendsChallenges = vm.activeChallenges.filter { it.visibility == ChallengeVisibility.FRIENDS_ONLY }
+    val filteredChallenges = remember(vm.activeChallenges, searchQuery, selectedFilterChip) {
+        vm.activeChallenges.filter { c ->
+            val matchesSearch = searchQuery.isBlank() ||
+                c.title.contains(searchQuery, ignoreCase = true) ||
+                c.type.name.contains(searchQuery, ignoreCase = true)
+
+            val matchesChip = when (selectedFilterChip) {
+                "Community" -> c.visibility == ChallengeVisibility.COMMUNITY
+                "Friends" -> c.visibility == ChallengeVisibility.FRIENDS_ONLY
+                "Races" -> c.type == ChallengeType.RACE_TOTAL_STEPS || c.type == ChallengeType.TOTAL_STEPS_DURATION
+                "Streaks" -> c.type == ChallengeType.DAILY_GOAL_STREAK
+                else -> true
+            }
+            matchesSearch && matchesChip
+        }
+    }
+
+    val communityChallenges = filteredChallenges.filter { it.visibility == ChallengeVisibility.COMMUNITY }
+    val friendsChallenges = filteredChallenges.filter { it.visibility == ChallengeVisibility.FRIENDS_ONLY }
+    val featuredChallenge = filteredChallenges.firstOrNull()
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (vm.isChallengesLoading && vm.activeChallenges.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-        } else if (vm.activeChallenges.isEmpty()) {
+        } else if (vm.activeChallenges.isEmpty() && searchQuery.isBlank()) {
             EmptyState(
                 icon = Icons.Default.EmojiEvents,
                 title = "No live challenges",
@@ -667,15 +1030,110 @@ fun ChallengesTab(vm: AppViewModel, onOpenChallenge: (String) -> Unit) {
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 80.dp)
+                contentPadding = PaddingValues(bottom = 88.dp)
             ) {
+                // Header Search & Filter Bar
                 item {
-                    SectionLabel("Friends challenges")
-                    if (friendsChallenges.isEmpty()) {
-                        EmptyStateLabel("No friends challenges yet.")
-                    } else {
+                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                        // Quick Stats Header Banner
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.EmojiEvents, null, tint = Color(0xFFFFB347), modifier = Modifier.size(22.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("${vm.activeChallenges.size} Active Challenges", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                                ) {
+                                    Text(
+                                        "${vm.activeChallenges.sumOf { it.participantIds.size.coerceAtLeast(1) }} Racers",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Search Bar
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Search challenges...") },
+                            leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(Icons.Default.Clear, null)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            )
+                        )
+
+                        Spacer(Modifier.height(12.dp))
+
+                        // Category Filter Chips Row
                         LazyRow(
-                            contentPadding = PaddingValues(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(end = 12.dp)
+                        ) {
+                            val chips = listOf("All", "Community", "Friends", "Races", "Streaks")
+                            items(chips) { chip ->
+                                val selected = selectedFilterChip == chip
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { selectedFilterChip = chip },
+                                    label = { Text(chip, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Featured Hero Banner (Top Challenge)
+                if (featuredChallenge != null && searchQuery.isBlank() && selectedFilterChip == "All") {
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                            Text("Featured Challenge", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black)
+                            Spacer(Modifier.height(8.dp))
+                            FeaturedChallengeCard(challenge = featuredChallenge, onClick = { onOpenChallenge(featuredChallenge.id) })
+                            Spacer(Modifier.height(16.dp))
+                        }
+                    }
+                }
+
+                // Friends Challenges Section
+                if (friendsChallenges.isNotEmpty()) {
+                    item {
+                        SectionLabel("Friends challenges")
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 20.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             items(friendsChallenges) { challenge ->
@@ -683,17 +1141,15 @@ fun ChallengesTab(vm: AppViewModel, onOpenChallenge: (String) -> Unit) {
                             }
                         }
                     }
+                    item { Spacer(modifier = Modifier.height(24.dp)) }
                 }
 
-                item { Spacer(modifier = Modifier.height(32.dp)) }
-
-                item {
-                    SectionLabel("Community challenges")
-                    if (communityChallenges.isEmpty()) {
-                        EmptyStateLabel("No community challenges yet.")
-                    } else {
+                // Community Challenges Section
+                if (communityChallenges.isNotEmpty()) {
+                    item {
+                        SectionLabel("Community challenges")
                         LazyRow(
-                            contentPadding = PaddingValues(horizontal = 24.dp),
+                            contentPadding = PaddingValues(horizontal = 20.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             items(communityChallenges) { challenge ->
@@ -702,12 +1158,25 @@ fun ChallengesTab(vm: AppViewModel, onOpenChallenge: (String) -> Unit) {
                         }
                     }
                 }
+
+                if (filteredChallenges.isEmpty() && searchQuery.isNotBlank()) {
+                    item {
+                        EmptyState(
+                            icon = Icons.Default.SearchOff,
+                            title = "No matching challenges",
+                            body = "Try searching for a different title or filter category.",
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
             }
         }
 
         ExtendedFloatingActionButton(
             onClick = { showCreate = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(24.dp),
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
             icon = { Icon(Icons.Default.Add, null) },
@@ -720,7 +1189,7 @@ fun ChallengesTab(vm: AppViewModel, onOpenChallenge: (String) -> Unit) {
             friends = vm.friends,
             onDismiss = { showCreate = false },
             onCreate = { title, type, visibility, goal, imageUrl, endDate, invites ->
-                vm.createChallenge(title, type, visibility, goal, imageUrl, invites)
+                vm.createChallenge(title, type, visibility, goal, imageUrl, endDate, invites)
                 showCreate = false
             }
         )
@@ -728,32 +1197,144 @@ fun ChallengesTab(vm: AppViewModel, onOpenChallenge: (String) -> Unit) {
 }
 
 @Composable
+fun FeaturedChallengeCard(challenge: Challenge, onClick: () -> Unit) {
+    val displayImage = remember(challenge.id, challenge.imageUrl) {
+        if (challenge.imageUrl.isNotBlank()) challenge.imageUrl
+        else "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=2070&auto=format&fit=crop"
+    }
+
+    val daysLeft = remember(challenge.endDate) {
+        val diff = challenge.endDate - System.currentTimeMillis()
+        if (diff > 0) (diff / (1000 * 60 * 60 * 24)).coerceAtLeast(1) else 1
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+    ) {
+        Column {
+            Box(modifier = Modifier
+                .fillMaxWidth()
+                .height(160.dp)) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(displayImage)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Black.copy(alpha = 0.2f), Color.Black.copy(alpha = 0.85f))
+                            )
+                        )
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFFF9800)
+                    ) {
+                        Text(
+                            "🏆 FEATURED",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.Black.copy(alpha = 0.6f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Timer, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("$daysLeft days left", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                        }
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        challenge.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "${formatNumber(challenge.dailyGoalTarget ?: 10000)} steps/day • ${if (challenge.visibility == ChallengeVisibility.COMMUNITY) "Community" else "Friends"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontFamily = StepDigits,
+                        color = Color(0xFFFFB347),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Groups, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("${challenge.participantIds.size.coerceAtLeast(1)} Participants", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = onClick,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Join Challenge 🚀", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun SectionLabel(text: String) {
     Text(
         text = text,
-        modifier = Modifier.padding(24.dp, 16.dp, 24.dp, 12.dp),
+        modifier = Modifier.padding(20.dp, 16.dp, 20.dp, 12.dp),
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Black
     )
 }
 
 @Composable
-fun EmptyStateLabel(text: String) {
-    Text(
-        text = text,
-        modifier = Modifier.padding(horizontal = 24.dp),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-    )
-}
-
-/**
- * Shared empty state: names the space, explains it in one line, and gives
- * an icon focal point instead of a bare line of gray text.
- */
-@Composable
 fun EmptyState(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     body: String,
     modifier: Modifier = Modifier.fillMaxWidth()
@@ -772,22 +1353,20 @@ fun EmptyState(
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             body,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center
         )
     }
 }
 
 @Composable
 fun ChallengeFlatCard(challenge: Challenge, onClick: () -> Unit) {
-    val progress = if (challenge.dailyGoalTarget != null && challenge.dailyGoalTarget > 0) {
-        0.4f // Placeholder 40%
-    } else 0f
+    val progress = if (challenge.dailyGoalTarget != null && challenge.dailyGoalTarget > 0) 0.5f else 0.2f
 
     val displayImage = remember(challenge.id, challenge.imageUrl) {
         if (challenge.imageUrl.isNotBlank()) challenge.imageUrl
@@ -796,23 +1375,21 @@ fun ChallengeFlatCard(challenge: Challenge, onClick: () -> Unit) {
                 "1552674605-db6ffd4facb5",
                 "1517836357463-d25dfeac3438",
                 "1534438327276-14e5300c3a48",
-                "1571019613454-1cb2f99b2d8b",
-                "1541534741688-6078c6bfb5c5",
-                "1526506118085-60ce8714f8c5",
-                "1517438984742-1262db08379e"
+                "1571019613454-1cb2f99b2d8b"
             )
-            val photoId = photoIds[kotlin.math.abs(challenge.id.hashCode()) % photoIds.size]
+            val photoId = photoIds[abs(challenge.id.hashCode()) % photoIds.size]
             "https://images.unsplash.com/photo-$photoId?q=80&w=2070&auto=format&fit=crop"
         }
     }
 
     Card(
         modifier = Modifier
-            .width(220.dp)
+            .width(230.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
             Box {
@@ -829,43 +1406,34 @@ fun ChallengeFlatCard(challenge: Challenge, onClick: () -> Unit) {
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentScale = ContentScale.Crop
                 )
-                
-                // Progress Gauge Overlay
-                if (challenge.dailyGoalTarget != null) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(12.dp)
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color.Black.copy(alpha = 0.3f))
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .fillMaxWidth(progress)
-                                .background(Color(0xFFFFB347))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(130.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
+                            )
                         )
-                    }
-                }
+                )
 
                 Surface(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier.padding(10.dp),
                     shape = RoundedCornerShape(12.dp),
                     color = Color.Black.copy(alpha = 0.65f)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             if (challenge.visibility == ChallengeVisibility.COMMUNITY) Icons.Default.Public else Icons.Default.Lock,
                             null,
-                            modifier = Modifier.size(12.dp),
+                            modifier = Modifier.size(11.dp),
                             tint = Color.White
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             if (challenge.visibility == ChallengeVisibility.COMMUNITY) "Community" else "Friends",
                             style = MaterialTheme.typography.labelSmall,
@@ -876,7 +1444,7 @@ fun ChallengeFlatCard(challenge: Challenge, onClick: () -> Unit) {
                 }
             }
 
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(14.dp)) {
                 Text(
                     challenge.title,
                     style = MaterialTheme.typography.titleMedium,
@@ -887,13 +1455,30 @@ fun ChallengeFlatCard(challenge: Challenge, onClick: () -> Unit) {
 
                 Spacer(Modifier.height(4.dp))
 
-                Text(
-                    "${challenge.dailyGoalTarget ?: "Race"} steps",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = StepDigits,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "${formatNumber(challenge.dailyGoalTarget ?: 0)} steps",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = StepDigits,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    ) {
+                        Text(
+                            challenge.type.name.split("_").first().lowercase().replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -915,6 +1500,13 @@ fun CreateChallengeDialog(
     var durationDays by remember { mutableIntStateOf(7) }
     val selectedFriends = remember { mutableStateListOf<String>() }
 
+    val presetImages = listOf(
+        "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=1000&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1000&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000&auto=format&fit=crop",
+        "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=1000&auto=format&fit=crop"
+    )
+
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri ->
@@ -923,152 +1515,107 @@ fun CreateChallengeDialog(
                 CloudinaryManager.uploadImage(
                     it,
                     onSuccess = { url ->
-                        imageUrl = url
                         isUploading = false
+                        imageUrl = url
                     },
-                    onError = { isUploading = false }
+                    onError = {
+                        isUploading = false
+                    }
                 )
             }
         }
     )
 
-    BasicAlertDialog(
+    AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-    ) {
-        Surface(
-            shape = RoundedCornerShape(32.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp
-        ) {
+        title = { Text("Create Challenge", fontWeight = FontWeight.Black) },
+        text = {
             Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    "Start challenge",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Black
-                )
-
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Challenge title") },
+                    label = { Text("Challenge Title") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(12.dp)
                 )
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    OutlinedTextField(
-                        value = goal,
-                        onValueChange = { goal = it },
-                        label = { Text("Daily steps") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
-                    )
+                OutlinedTextField(
+                    value = goal,
+                    onValueChange = { goal = it.filter { c -> c.isDigit() } },
+                    label = { Text("Step Target Goal") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
 
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .clickable { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isUploading) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                        } else if (imageUrl.isNotEmpty()) {
-                            AsyncImage(model = imageUrl, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                        } else {
-                            Icon(Icons.Default.AddPhotoAlternate, null, tint = MaterialTheme.colorScheme.primary)
-                        }
-                    }
+                Text("Visibility", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = selectedVisibility == ChallengeVisibility.FRIENDS_ONLY,
+                        onClick = { selectedVisibility = ChallengeVisibility.FRIENDS_ONLY },
+                        label = { Text("Friends Only") }
+                    )
+                    FilterChip(
+                        selected = selectedVisibility == ChallengeVisibility.COMMUNITY,
+                        onClick = { selectedVisibility = ChallengeVisibility.COMMUNITY },
+                        label = { Text("Public Community") }
+                    )
                 }
 
-                Column {
-                    Text("Duration", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
+                if (selectedVisibility == ChallengeVisibility.FRIENDS_ONLY && friends.isNotEmpty()) {
+                    Text("Invite Friends", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(listOf(1, 3, 7, 30)) { days ->
-                            val selected = durationDays == days
+                        items(friends) { friend ->
+                            val selected = selectedFriends.contains(friend.uid)
                             FilterChip(
                                 selected = selected,
-                                onClick = { durationDays = days },
-                                label = { Text(if (days >= 30) "1 month" else if (days == 7) "1 week" else "$days days") },
-                                shape = RoundedCornerShape(12.dp)
+                                onClick = {
+                                    if (selected) selectedFriends.remove(friend.uid)
+                                    else selectedFriends.add(friend.uid)
+                                },
+                                label = { Text(friend.displayName) }
                             )
                         }
                     }
                 }
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Type", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                        ChallengeType.entries.forEach { type ->
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { selectedType = type }.padding(vertical = 4.dp)) {
-                                RadioButton(selected = selectedType == type, onClick = { selectedType = type })
-                                Text(type.name.split("_").first().lowercase().customCapitalize(), style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Visibility", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                        ChallengeVisibility.entries.forEach { vis ->
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { selectedVisibility = vis }.padding(vertical = 4.dp)) {
-                                RadioButton(selected = selectedVisibility == vis, onClick = { selectedVisibility = vis })
-                                Text(vis.name.replace("_", " ").lowercase().customCapitalize(), style = MaterialTheme.typography.bodyMedium)
-                            }
-                        }
-                    }
-                }
-
-                if (selectedVisibility == ChallengeVisibility.FRIENDS_ONLY) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text("Invite friends", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                        if (friends.isEmpty()) {
-                            Text("No friends yet.", color = Color.Gray, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
-                        } else {
-                            Column(modifier = Modifier.heightIn(max = 160.dp).verticalScroll(rememberScrollState())) {
-                                friends.forEach { f ->
-                                    val isSelected = selectedFriends.contains(f.uid)
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().clickable {
-                                            if (isSelected) selectedFriends.remove(f.uid) else selectedFriends.add(f.uid)
-                                        }.padding(vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Checkbox(checked = isSelected, onCheckedChange = null)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(f.displayName, style = MaterialTheme.typography.bodyLarge)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("Cancel") }
+                Text("Cover Image", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Button(
                         onClick = {
-                            val end = System.currentTimeMillis() + (durationDays.toLong() * 24 * 60 * 60 * 1000)
-                            onCreate(title, selectedType, selectedVisibility, goal.toIntOrNull() ?: 0, imageUrl, end, selectedFriends.toList())
+                            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         },
-                        enabled = title.isNotBlank() && !isUploading,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp)
+                        enabled = !isUploading,
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Launch", fontWeight = FontWeight.Bold)
+                        if (isUploading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        else Text("Upload Image")
                     }
                 }
             }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val goalNum = goal.toIntOrNull() ?: 10000
+                    val finalImage = imageUrl.ifBlank { presetImages.first() }
+                    val endDate = System.currentTimeMillis() + durationDays * 86400000L
+                    onCreate(title.ifBlank { "Step Challenge" }, selectedType, selectedVisibility, goalNum, finalImage, endDate, selectedFriends)
+                },
+                enabled = title.isNotBlank() && !isUploading
+            ) {
+                Text("Create")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
         }
-    }
+    )
 }
-
-private fun String.customCapitalize() = replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }

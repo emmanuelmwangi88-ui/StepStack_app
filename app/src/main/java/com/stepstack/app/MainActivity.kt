@@ -33,6 +33,7 @@ import com.stepstack.app.audio.LocalWorkoutAudioManager
 import com.stepstack.app.audio.rememberWorkoutAudioManager
 import com.stepstack.app.navigation.AppNavHost
 import com.stepstack.app.navigation.Route
+import com.stepstack.app.service.watchdog.ServiceWatchdogWorker
 import com.stepstack.app.ui.screens.LogOutdoorSheet
 import com.stepstack.app.ui.screens.OnboardingScreen
 import com.stepstack.app.ui.screens.WalkTimerSheet
@@ -87,11 +88,13 @@ class MainActivity : ComponentActivity() {
 
                         if (activityGranted && notificationGranted) {
                             vm.startHardwareTracking(context)
+                            ServiceWatchdogWorker.schedule(context)
                         }
                     }
 
                     LaunchedEffect(Unit) {
                         vm.loadData(context)
+                        ServiceWatchdogWorker.schedule(context)
                         
                         val pm = context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
                         vm.isBatteryOptimizationIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -137,6 +140,7 @@ class MainActivity : ComponentActivity() {
                         }
                     } else if (showAuth) {
                         com.stepstack.app.ui.screens.AuthScreen(
+                            savedProfilePhoto = vm.savedProfilePhoto,
                             onAuthSuccess = { 
                                 vm.syncFromFirebase(context) { success ->
                                     if (success) {
@@ -160,6 +164,7 @@ class MainActivity : ComponentActivity() {
                         MainApp(vm)
                     } else {
                         com.stepstack.app.ui.screens.AuthScreen(
+                            savedProfilePhoto = vm.savedProfilePhoto,
                             onAuthSuccess = { 
                                 vm.syncFromFirebase(context) { _ ->
                                     showAuth = false
@@ -262,7 +267,6 @@ fun MainApp(vm: AppViewModel) {
             vm = vm,
             snackbarHostState = snackbar,
             padding = padding,
-            onLogSteps = { navController.navigate(Route.Steps.route) },
             onLogOutdoor = { showLogOutdoor = true },
             onStartWalk = { showWalkTimer = true }
         )
@@ -296,16 +300,10 @@ fun MainApp(vm: AppViewModel) {
 
     if (showLogOutdoor) {
         ModalBottomSheet(onDismissRequest = { showLogOutdoor = false }) {
-            LogOutdoorSheet { minutes, activity ->
-                vm.addWorkoutMinutes(context, minutes, com.stepstack.app.data.WorkoutSession(
-                    workoutId = "outdoor",
-                    workoutName = activity,
-                    dateEpochDay = vm.today,
-                    durationActualMin = minutes,
-                    completedPercent = 100
-                ))
+            LogOutdoorSheet { minutes, activity, convertedSteps, calories ->
+                vm.addOutdoorActivity(context, activity, minutes, convertedSteps, calories)
                 showLogOutdoor = false
-                scope.launch { snackbar.showSnackbar("Logged $minutes min of $activity") }
+                scope.launch { snackbar.showSnackbar("Logged $minutes min of $activity (+$convertedSteps step points, $calories kcal)") }
             }
         }
     }

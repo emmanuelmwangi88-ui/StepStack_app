@@ -8,12 +8,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -83,7 +83,7 @@ fun FriendProfileScreen(
                             .clip(CircleShape)
                             .background(Color.Black.copy(alpha = 0.3f))
                     ) {
-                        Icon(Icons.Default.ArrowBack, null, tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -191,7 +191,7 @@ fun FriendProfileScreen(
                         modifier = Modifier.weight(1f),
                         label = "Today's Steps",
                         value = u.lastSyncedStepCount.toString(),
-                        icon = Icons.Default.DirectionsWalk,
+                        icon = Icons.AutoMirrored.Filled.DirectionsWalk,
                         color = DarkPrimary
                     )
                     ModernStatCard(

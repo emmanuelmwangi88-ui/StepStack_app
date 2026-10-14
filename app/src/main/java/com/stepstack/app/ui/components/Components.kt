@@ -11,6 +11,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,6 +37,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.stepstack.app.data.DailyActivity
@@ -42,6 +46,26 @@ import com.stepstack.app.data.AppNotification
 import com.stepstack.app.data.Achievement
 import com.stepstack.app.ui.theme.*
 import kotlin.math.min
+
+@Composable
+fun FastImage(
+    model: Any?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
+) {
+    AsyncImage(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(model)
+            .crossfade(true)
+            .memoryCachePolicy(CachePolicy.ENABLED)
+            .diskCachePolicy(CachePolicy.ENABLED)
+            .build(),
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = contentScale
+    )
+}
 
 @Composable
 fun MovementScoreRing(
@@ -461,9 +485,9 @@ fun AchievementBadge(a: Achievement) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = when(a.icon) {
-                            "footprint" -> Icons.Default.DirectionsWalk
+                            "footprint" -> Icons.AutoMirrored.Filled.DirectionsWalk
                             "calendar" -> Icons.Default.CalendarToday
-                            "steps" -> Icons.Default.DirectionsRun
+                            "steps" -> Icons.AutoMirrored.Filled.DirectionsRun
                             "flame" -> Icons.Default.Whatshot
                             "dumbbell" -> Icons.Default.FitnessCenter
                             "trophy" -> Icons.Default.EmojiEvents
@@ -471,7 +495,7 @@ fun AchievementBadge(a: Achievement) {
                             "water_drop" -> Icons.Default.Opacity
                             "wb_sunny" -> Icons.Default.WbSunny
                             "bedtime" -> Icons.Default.Bedtime
-                            "trending_up" -> Icons.Default.TrendingUp
+                            "trending_up" -> Icons.AutoMirrored.Filled.TrendingUp
                             "insights" -> Icons.Default.Insights
                             else -> Icons.Default.EmojiEvents
                         },
@@ -648,7 +672,15 @@ fun BarChart(
     viewType: ChartViewType = ChartViewType.WEEK,
     showExtremes: Boolean = true
 ) {
-    val actualBarColor = barColor ?: MaterialTheme.colorScheme.primary
+    val barPalette = listOf(
+        Teal600,
+        Lime500,
+        Amber500,
+        Coral500,
+        Color(0xFF9575CD),
+        Color(0xFF4FC3F7),
+        Color(0xFFE91E63)
+    )
     val maxVal = (values.maxOrNull() ?: 1f).coerceAtLeast(1f)
     val isEmpty = values.all { it == 0f }
     
@@ -703,6 +735,7 @@ fun BarChart(
                         val isHighlighted = highlightLast && i == values.lastIndex
                         val isMax = i == maxIndex && v > 0
                         val isMin = i == minIndex && v > 0
+                        val paletteColor = barColor ?: barPalette[i % barPalette.size]
                         
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -732,8 +765,8 @@ fun BarChart(
                                                 when {
                                                     isMax -> listOf(Lime500, Lime500.copy(alpha = 0.7f))
                                                     isMin -> listOf(Coral500, Coral500.copy(alpha = 0.7f))
-                                                    isHighlighted -> listOf(actualBarColor.copy(alpha = 0.9f), actualBarColor.copy(alpha = 0.5f))
-                                                    else -> listOf(actualBarColor, actualBarColor.copy(alpha = 0.6f))
+                                                    isHighlighted -> listOf(paletteColor.copy(alpha = 0.9f), paletteColor.copy(alpha = 0.5f))
+                                                    else -> listOf(paletteColor, paletteColor.copy(alpha = 0.6f))
                                                 }
                                             )
                                         ),
@@ -757,7 +790,7 @@ fun BarChart(
                                         color = when {
                                             isMax -> Lime500
                                             isMin -> Coral500
-                                            isHighlighted -> actualBarColor
+                                            isHighlighted -> paletteColor
                                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                                         },
                                         fontWeight = if (isHighlighted || isMax || isMin) FontWeight.Black else FontWeight.Bold,

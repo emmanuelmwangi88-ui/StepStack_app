@@ -7,7 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Public
@@ -29,6 +29,7 @@ import com.stepstack.app.data.*
 import com.stepstack.app.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +95,7 @@ fun ChallengeDetailScreen(
                 title = { Text(challenge?.title ?: "Challenge") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                     }
                 },
                 actions = {
@@ -310,7 +311,7 @@ fun ChallengeHeaderExtended(challenge: Challenge, userSteps: Int = 0) {
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text("Type", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                        Text(challenge.type.name.split("_").first().lowercase().capitalize(), fontWeight = FontWeight.Bold)
+                        Text(challenge.type.name.split("_").first().lowercase().customCapitalize(), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -331,8 +332,13 @@ fun ParticipantRankRow(user: FirestoreUser?, steps: Int, rank: Int) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                "#$rank",
-                modifier = Modifier.width(32.dp),
+                when (rank) {
+                    1 -> "🥇"
+                    2 -> "🥈"
+                    3 -> "🥉"
+                    else -> "#$rank"
+                },
+                modifier = Modifier.width(36.dp),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Black,
                 color = when(rank) {
@@ -393,4 +399,5 @@ fun EditChallengeDialog(
     )
 }
 
-fun String.capitalize() = replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
+private fun String.customCapitalize() = replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+

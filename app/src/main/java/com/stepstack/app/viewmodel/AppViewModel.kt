@@ -5,17 +5,21 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.stepstack.app.data.*
 import com.stepstack.app.notifications.NotificationSystem
 import com.stepstack.app.service.StepTrackerService
 import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.util.UUID
 import kotlin.math.roundToInt
 
 class AppViewModel : ViewModel() {
@@ -46,6 +50,7 @@ class AppViewModel : ViewModel() {
     var snoozeCounts = mutableStateMapOf<String, Int>()
 
     var profilePicIndex by mutableIntStateOf(0)
+    var savedProfilePhoto by mutableStateOf("")
     var waterIntake = mutableIntStateOf(0)
     val waterTarget = 8
     
@@ -212,6 +217,7 @@ class AppViewModel : ViewModel() {
         onboardingComplete = p.getBoolean("onboarding_complete", false)
         isDemoMode = p.getBoolean("is_demo_mode", false)
         profilePicIndex = p.getInt("profile_pic_index", 0)
+        savedProfilePhoto = p.getString("saved_profile_photo", "") ?: ""
         customStepGoal = p.getInt("custom_step_goal", 8000)
         themeMode = p.getString("theme_mode", "System") ?: "System"
         waterIntake.intValue = p.getInt("water_intake_${today}", 0)
@@ -226,6 +232,13 @@ class AppViewModel : ViewModel() {
             }
             startPeriodicSync()
             refreshCompetitionData()
+        }
+
+        if (user.photoUrl.isNotBlank()) {
+            savedProfilePhoto = user.photoUrl
+            p.edit().putString("saved_profile_photo", savedProfilePhoto).apply()
+        } else if (savedProfilePhoto.isNotBlank()) {
+            user = user.copy(photoUrl = savedProfilePhoto)
         }
 
         // Real-time flow observation from service for "immediate" UI updates
@@ -260,56 +273,146 @@ class AppViewModel : ViewModel() {
         }
     }
 
-    fun refreshCompetitionData() {
-        viewModelScope.launch {
-            if (activeChallenges.isEmpty()) isChallengesLoading = true
-            if (friends.isEmpty()) isFriendsLoading = true
-            
-            val remoteChallenges = FirebaseManager.getActiveChallenges()
-            activeChallenges.clear()
-            activeChallenges.addAll(remoteChallenges)
-            isChallengesLoading = false
-            
-            if (FirebaseManager.isUserLoggedIn()) {
-                val remoteFriends = FirebaseManager.getFriends()
-                friends.clear()
-                friends.addAll(remoteFriends)
-            }
-            
-            val remoteAllUsers = FirebaseManager.getAllUsers()
-            allUsers.clear()
-            allUsers.addAll(remoteAllUsers)
-            isFriendsLoading = false
+    private fun getLocalChallenges(): List<Challenge> {
+        val jsonStr = prefs?.getString("local_challenges", null) ?: return emptyList()
+        return try {
+            Json.decodeFromString<List<Challenge>>(jsonStr)
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
-    fun createChallenge(title: String, type: ChallengeType, visibility: ChallengeVisibility, goal: Int, imageUrl: String, invites: List<String>) {
+    private fun saveLocalChallenge(challenge: Challenge) {
+        val current = getLocalChallenges().toMutableList()
+        current.removeAll { it.id == challenge.id }
+        current.add(0, challenge)
+        prefs?.edit()?.putString("local_challenges", Json.encodeToString(current))?.apply()
+    }
+
+    fun refreshCompetitionData() {
         viewModelScope.launch {
-            val challenge = Challenge(
-                title = title,
-                type = type,
-                visibility = visibility,
-                imageUrl = imageUrl,
-                startDate = System.currentTimeMillis(),
-                endDate = System.currentTimeMillis() + (7 * 24 * 60 * 60 * 1000), 
-                dailyGoalTarget = goal
-            )
-            FirebaseManager.createChallenge(challenge, invites)
-            refreshCompetitionData()
+            try {
+                if (activeChallenges.isEmpty()) isChallengesLoading = true
+                if (friends.isEmpty()) isFriendsLoading = true
+                
+                val remoteChallenges = FirebaseManager.getActiveChallenges()
+                val localChallenges = getLocalChallenges()
+                val combinedChallenges = (remoteChallenges + localChallenges).distinctBy { it.id }
+                
+                val defaultPresetChallenges = listOf(
+                    Challenge(
+                        id = "default_7day_sprint",
+                        title = "7-Day Step Sprint",
+                        type = ChallengeType.DAILY_GOAL_STREAK,
+                        visibility = ChallengeVisibility.COMMUNITY,
+                        dailyGoalTarget = 10000,
+                        imageUrl = "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=1000&auto=format&fit=crop",
+                        startDate = System.currentTimeMillis(),
+                        endDate = System.currentTimeMillis() + 7 * 86400000L,
+                        status = ChallengeStatus.ACTIVE
+                    ),
+                    Challenge(
+                        id = "default_weekend_warrior",
+                        title = "Weekend Warrior 25K",
+                        type = ChallengeType.RACE_TOTAL_STEPS,
+                        visibility = ChallengeVisibility.COMMUNITY,
+                        dailyGoalTarget = 12500,
+                        imageUrl = "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1000&auto=format&fit=crop",
+                        startDate = System.currentTimeMillis(),
+                        endDate = System.currentTimeMillis() + 3 * 86400000L,
+                        status = ChallengeStatus.ACTIVE
+                    ),
+                    Challenge(
+                        id = "default_community_marathon",
+                        title = "Community 50K Marathon",
+                        type = ChallengeType.TOTAL_STEPS_DURATION,
+                        visibility = ChallengeVisibility.COMMUNITY,
+                        dailyGoalTarget = 50000,
+                        imageUrl = "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000&auto=format&fit=crop",
+                        startDate = System.currentTimeMillis(),
+                        endDate = System.currentTimeMillis() + 14 * 86400000L,
+                        status = ChallengeStatus.ACTIVE
+                    )
+                )
+
+                activeChallenges.clear()
+                if (combinedChallenges.isNotEmpty()) {
+                    activeChallenges.addAll(combinedChallenges)
+                } else {
+                    activeChallenges.addAll(defaultPresetChallenges)
+                }
+                
+                if (FirebaseManager.isUserLoggedIn()) {
+                    try {
+                        FirebaseManager.saveUser(user)
+                        FirebaseManager.syncActivity(todayActivity)
+                    } catch (e: Exception) {
+                        Log.e("AppViewModel", "Error syncing user on competition refresh", e)
+                    }
+                    val remoteFriends = FirebaseManager.getFriends()
+                    friends.clear()
+                    friends.addAll(remoteFriends)
+                }
+                
+                val remoteAllUsers = FirebaseManager.getAllUsers()
+                allUsers.clear()
+                allUsers.addAll(remoteAllUsers)
+            } catch (e: Exception) {
+                Log.e("AppViewModel", "Error refreshing competition data", e)
+            } finally {
+                isChallengesLoading = false
+                isFriendsLoading = false
+            }
+        }
+    }
+
+    fun createChallenge(title: String, type: ChallengeType, visibility: ChallengeVisibility, goal: Int, imageUrl: String, endDate: Long, invites: List<String>) {
+        viewModelScope.launch {
+            try {
+                val challengeId = UUID.randomUUID().toString()
+                val challenge = Challenge(
+                    id = challengeId,
+                    title = title,
+                    type = type,
+                    visibility = visibility,
+                    imageUrl = imageUrl,
+                    startDate = System.currentTimeMillis(),
+                    endDate = endDate, 
+                    dailyGoalTarget = goal
+                )
+                saveLocalChallenge(challenge)
+                if (!activeChallenges.any { it.id == challengeId }) {
+                    activeChallenges.add(0, challenge)
+                }
+                if (FirebaseManager.isUserLoggedIn()) {
+                    FirebaseManager.createChallenge(challenge, invites)
+                }
+                refreshCompetitionData()
+            } catch (e: Exception) {
+                Log.e("AppViewModel", "Error creating challenge", e)
+            }
         }
     }
     
     fun joinChallenge(challengeId: String) {
         viewModelScope.launch {
-            FirebaseManager.joinChallenge(challengeId)
-            refreshCompetitionData()
+            try {
+                FirebaseManager.joinChallenge(challengeId)
+                refreshCompetitionData()
+            } catch (e: Exception) {
+                Log.e("AppViewModel", "Error joining challenge", e)
+            }
         }
     }
 
     fun deleteChallenge(challengeId: String) {
         viewModelScope.launch {
-            FirebaseManager.deleteChallenge(challengeId)
-            refreshCompetitionData()
+            try {
+                FirebaseManager.deleteChallenge(challengeId)
+                refreshCompetitionData()
+            } catch (e: Exception) {
+                Log.e("AppViewModel", "Error deleting challenge", e)
+            }
         }
     }
 
@@ -318,6 +421,12 @@ class AppViewModel : ViewModel() {
         p.edit().apply {
             putBoolean("onboarding_complete", onboardingComplete)
             putBoolean("is_demo_mode", isDemoMode)
+            if (user.photoUrl.isNotBlank()) {
+                putString("saved_profile_photo", user.photoUrl)
+                savedProfilePhoto = user.photoUrl
+            } else if (savedProfilePhoto.isNotBlank()) {
+                putString("saved_profile_photo", savedProfilePhoto)
+            }
             putString("user_data", Json.encodeToString(user))
             putInt("grace_days_left", graceDaysRemaining)
             putInt("profile_pic_index", profilePicIndex)
@@ -341,6 +450,21 @@ class AppViewModel : ViewModel() {
 
     fun updateProfilePhoto(context: Context, photoUrl: String) {
         user = user.copy(photoUrl = photoUrl)
+        savedProfilePhoto = photoUrl
+        val p = prefs ?: context.getSharedPreferences("stepstack_prefs", Context.MODE_PRIVATE)
+        p.edit().putString("saved_profile_photo", photoUrl).apply()
+
+        FirebaseManager.currentUser?.let { firebaseUser ->
+            try {
+                val profileUpdates = UserProfileChangeRequest.Builder()
+                    .setPhotoUri(Uri.parse(photoUrl))
+                    .build()
+                firebaseUser.updateProfile(profileUpdates)
+            } catch (e: Exception) {
+                Log.e("AppViewModel", "Failed to update Firebase Auth profile photo", e)
+            }
+        }
+
         saveData(context)
     }
 
@@ -349,12 +473,6 @@ class AppViewModel : ViewModel() {
         var checkDay = today
         val target = adaptiveTargetScore
         
-        // Check if user has been inactive for 5+ days
-        val lastActiveDay = activityHistory.filter { it.movementScore > 0 }.maxByOrNull { it.epochDay }?.epochDay ?: 0L
-        if (today - lastActiveDay >= 5 && lastActiveDay != 0L) {
-            // Welcome back state handled in UI
-        }
-
         if (activityFor(checkDay).movementScore < target && !graceDaysUsed.contains(checkDay)) {
             // If today isn't met yet, start checking from yesterday
             checkDay--
@@ -579,8 +697,58 @@ class AppViewModel : ViewModel() {
         }
     }
 
+    fun addOutdoorActivity(context: Context, activity: String, minutes: Int, convertedSteps: Int, calories: Int) {
+        viewModelScope.launch {
+            val cur = todayActivity
+            val newSteps = cur.steps + convertedSteps
+            val newMinutes = cur.workoutMinutes + minutes
+            val newCalories = cur.caloriesBurned + calories
+            
+            db.activityDao().insertActivity(DailyActivityEntity(
+                epochDay = today,
+                steps = newSteps,
+                workoutMinutes = newMinutes,
+                goalForDay = cur.goalForDay,
+                distanceMeters = cur.distanceMeters + (convertedSteps * 0.75).toInt(),
+                caloriesBurned = newCalories
+            ))
+            
+            val session = WorkoutSession(
+                workoutId = "outdoor_${activity.lowercase()}",
+                workoutName = activity,
+                dateEpochDay = today,
+                durationActualMin = minutes,
+                completedPercent = 100,
+                caloriesBurned = calories
+            )
+            db.activityDao().insertSession(WorkoutSessionEntity(
+                workoutId = session.workoutId,
+                workoutName = session.workoutName,
+                dateEpochDay = session.dateEpochDay,
+                durationActualMin = session.durationActualMin,
+                completedPercent = 100,
+                exercisesCompleted = 0,
+                caloriesBurned = calories,
+                startTimeMillis = session.startTimeMillis
+            ))
+            
+            sessions.add(0, session)
+            ensureTodayActivity()
+            updateStreak()
+            saveData(context)
+            checkAchievements()
+        }
+    }
+
     fun addWater(context: Context) {
         waterIntake.intValue++; checkAchievements(); saveData(context)
+    }
+
+    fun removeWater(context: Context) {
+        if (waterIntake.intValue > 0) {
+            waterIntake.intValue--
+            saveData(context)
+        }
     }
 
     fun addWorkoutMinutes(context: Context, minutes: Int, session: WorkoutSession) {
@@ -673,15 +841,22 @@ class AppViewModel : ViewModel() {
     }
 
     fun logout(context: Context) {
+        val currentPhoto = user.photoUrl.ifBlank { savedProfilePhoto }
         FirebaseManager.logout()
         onboardingComplete = false
         isDemoMode = false
         user = User()
+        if (currentPhoto.isNotBlank()) {
+            savedProfilePhoto = currentPhoto
+            val p = prefs ?: context.getSharedPreferences("stepstack_prefs", Context.MODE_PRIVATE)
+            p.edit().putString("saved_profile_photo", currentPhoto).apply()
+        }
         saveData(context)
     }
 
     fun syncFromFirebase(context: Context, onResult: (Boolean) -> Unit = {}) {
-        if (!FirebaseManager.isUserLoggedIn()) {
+        val firebaseUser = FirebaseManager.currentUser
+        if (firebaseUser == null) {
             onResult(false)
             return
         }
@@ -691,17 +866,40 @@ class AppViewModel : ViewModel() {
                 val remoteUser = FirebaseManager.fetchUser()
                 if (remoteUser != null) {
                     user = remoteUser
-                    onboardingComplete = true
-                    saveData(context)
-                    startPeriodicSync()
-                    refreshCompetitionData()
-                    onResult(true)
                 } else {
-                    onResult(false)
+                    val emailStr = firebaseUser.email ?: ""
+                    val nameStr = firebaseUser.displayName ?: emailStr.split("@").firstOrNull() ?: "Athlete"
+                    val photo = firebaseUser.photoUrl?.toString()?.ifBlank { savedProfilePhoto } ?: savedProfilePhoto
+                    user = user.copy(
+                        name = nameStr,
+                        email = emailStr,
+                        photoUrl = photo
+                    )
                 }
+                if (user.photoUrl.isNotBlank()) {
+                    savedProfilePhoto = user.photoUrl
+                } else if (savedProfilePhoto.isNotBlank()) {
+                    user = user.copy(photoUrl = savedProfilePhoto)
+                }
+                onboardingComplete = true
+                isDemoMode = false
+                saveData(context)
+                startPeriodicSync()
+                refreshCompetitionData()
+                onResult(true)
+            } catch (e: Exception) {
+                onboardingComplete = true
+                isDemoMode = false
+                saveData(context)
+                startPeriodicSync()
+                refreshCompetitionData()
+                onResult(true)
             } catch (e: Exception) {
                 Log.e("AppViewModel", "Firebase sync failed", e)
-                onResult(false)
+                onboardingComplete = true
+                isDemoMode = false
+                saveData(context)
+                onResult(true)
             } finally {
                 isSyncing = false
             }
@@ -711,8 +909,12 @@ class AppViewModel : ViewModel() {
     fun syncWithFirebase() {
         if (isDemoMode || !FirebaseManager.isUserLoggedIn()) return
         viewModelScope.launch {
-            FirebaseManager.saveUser(user)
-            FirebaseManager.syncActivity(todayActivity)
+            try {
+                FirebaseManager.saveUser(user)
+                FirebaseManager.syncActivity(todayActivity)
+            } catch (e: Exception) {
+                Log.e("AppViewModel", "Error in syncWithFirebase", e)
+            }
         }
     }
 
@@ -813,10 +1015,12 @@ class AppViewModel : ViewModel() {
 
     fun requestIgnoreBatteryOptimizations(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = android.net.Uri.parse("package:${context.packageName}")
+            try {
+                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e("AppViewModel", "Failed to open battery optimization settings", e)
             }
-            context.startActivity(intent)
         }
     }
 

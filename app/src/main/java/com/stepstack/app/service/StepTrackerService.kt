@@ -2,8 +2,10 @@ package com.stepstack.app.service
 
 import android.app.*
 import android.content.*
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.stepstack.app.MainActivity
@@ -65,7 +67,7 @@ class StepTrackerService : Service() {
         counterManager = StepCounterManager(this)
 
         // Acquire partial wake lock to keep sensors alive
-        val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "StepStack:StepTrackerWakeLock")
         wakeLock?.acquire()
 
@@ -119,10 +121,19 @@ class StepTrackerService : Service() {
 
     private fun startForegroundServiceWithNotification() {
         val initialNotification = createNotification(currentSteps)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIFICATION_ID, initialNotification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH)
-        } else {
-            startForeground(NOTIFICATION_ID, initialNotification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(NOTIFICATION_ID, initialNotification, ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH)
+            } else {
+                startForeground(NOTIFICATION_ID, initialNotification)
+            }
+        } catch (e: Exception) {
+            Log.e("StepTrackerService", "Error starting foreground service with type HEALTH, trying fallback", e)
+            try {
+                startForeground(NOTIFICATION_ID, initialNotification)
+            } catch (e2: Exception) {
+                Log.e("StepTrackerService", "Failed fallback startForeground", e2)
+            }
         }
     }
 
@@ -239,6 +250,15 @@ class StepTrackerService : Service() {
         counterManager.stopTracking()
         wakeLock?.let { if (it.isHeld) it.release() }
         serviceScope.cancel()
+
+        try {
+            val restartIntent = Intent(applicationContext, BootReceiver::class.java).apply {
+                action = "com.stepstack.app.RESTART_TRACKER_SERVICE"
+            }
+            sendBroadcast(restartIntent)
+        } catch (e: Exception) {
+            Log.e("StepTrackerService", "Error sending restart broadcast", e)
+        }
         super.onDestroy()
     }
 }

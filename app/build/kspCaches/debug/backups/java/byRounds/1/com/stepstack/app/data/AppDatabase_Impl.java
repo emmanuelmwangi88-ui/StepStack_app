@@ -39,12 +39,12 @@ public final class AppDatabase_Impl extends AppDatabase {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `workouts` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `category` TEXT NOT NULL, `difficulty` TEXT NOT NULL, `durationMin` INTEGER NOT NULL, `calories` INTEGER NOT NULL, `equipment` TEXT NOT NULL, `description` TEXT NOT NULL, `exercisesJson` TEXT NOT NULL, `isFavorite` INTEGER NOT NULL, `thumbnailUrl` TEXT NOT NULL, PRIMARY KEY(`id`))");
-        db.execSQL("CREATE TABLE IF NOT EXISTS `workout_sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `workoutId` TEXT NOT NULL, `workoutName` TEXT NOT NULL, `dateEpochDay` INTEGER NOT NULL, `durationActualMin` INTEGER NOT NULL, `completedPercent` INTEGER NOT NULL, `exercisesCompleted` INTEGER NOT NULL, `caloriesBurned` INTEGER NOT NULL, `startTimeMillis` INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `workout_sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `workoutId` TEXT NOT NULL, `workoutName` TEXT NOT NULL, `dateEpochDay` INTEGER NOT NULL, `durationActualMin` INTEGER NOT NULL, `completedPercent` INTEGER NOT NULL, `exercisesCompleted` INTEGER NOT NULL, `caloriesBurned` INTEGER NOT NULL, `startTimeMillis` INTEGER NOT NULL, `thumbnailUrl` TEXT NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `daily_activity` (`epochDay` INTEGER NOT NULL, `steps` INTEGER NOT NULL, `workoutMinutes` INTEGER NOT NULL, `goalForDay` INTEGER NOT NULL, `distanceMeters` INTEGER NOT NULL, `caloriesBurned` INTEGER NOT NULL, PRIMARY KEY(`epochDay`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `step_events` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `epochDay` INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS `achievements` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT NOT NULL, `icon` TEXT NOT NULL, `unlocked` INTEGER NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3cb7c40f85a69b66811b09c92ed71625')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f8d6bcb291aad9aa5ae2167c395ed3d9')");
       }
 
       @Override
@@ -118,7 +118,7 @@ public final class AppDatabase_Impl extends AppDatabase {
                   + " Expected:\n" + _infoWorkouts + "\n"
                   + " Found:\n" + _existingWorkouts);
         }
-        final HashMap<String, TableInfo.Column> _columnsWorkoutSessions = new HashMap<String, TableInfo.Column>(9);
+        final HashMap<String, TableInfo.Column> _columnsWorkoutSessions = new HashMap<String, TableInfo.Column>(10);
         _columnsWorkoutSessions.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsWorkoutSessions.put("workoutId", new TableInfo.Column("workoutId", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsWorkoutSessions.put("workoutName", new TableInfo.Column("workoutName", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
@@ -128,6 +128,7 @@ public final class AppDatabase_Impl extends AppDatabase {
         _columnsWorkoutSessions.put("exercisesCompleted", new TableInfo.Column("exercisesCompleted", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsWorkoutSessions.put("caloriesBurned", new TableInfo.Column("caloriesBurned", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsWorkoutSessions.put("startTimeMillis", new TableInfo.Column("startTimeMillis", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsWorkoutSessions.put("thumbnailUrl", new TableInfo.Column("thumbnailUrl", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         final HashSet<TableInfo.ForeignKey> _foreignKeysWorkoutSessions = new HashSet<TableInfo.ForeignKey>(0);
         final HashSet<TableInfo.Index> _indicesWorkoutSessions = new HashSet<TableInfo.Index>(0);
         final TableInfo _infoWorkoutSessions = new TableInfo("workout_sessions", _columnsWorkoutSessions, _foreignKeysWorkoutSessions, _indicesWorkoutSessions);
@@ -183,7 +184,7 @@ public final class AppDatabase_Impl extends AppDatabase {
         }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "3cb7c40f85a69b66811b09c92ed71625", "947d72d11969e802100241868e82f10b");
+    }, "f8d6bcb291aad9aa5ae2167c395ed3d9", "cba3f659b2862db83691ea23305fcf1a");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;

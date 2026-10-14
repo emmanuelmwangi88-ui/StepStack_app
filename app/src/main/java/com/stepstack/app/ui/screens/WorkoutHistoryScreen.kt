@@ -22,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.stepstack.app.data.WorkoutSession
 import com.stepstack.app.ui.components.BarChart
-import com.stepstack.app.ui.theme.Teal600
 import com.stepstack.app.viewmodel.AppViewModel
 import java.time.LocalDate
 
@@ -70,6 +69,21 @@ fun WorkoutHistoryScreen(vm: AppViewModel, onBack: () -> Unit) {
             contentPadding = PaddingValues(bottom = 88.dp, start = 16.dp, end = 16.dp, top = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val totalMinutes = vm.sessions.sumOf { it.durationActualMin }
+                    val totalCalories = vm.sessions.sumOf { it.caloriesBurned }
+                    val totalWorkouts = vm.sessions.size
+
+                    HistoryStatChip(label = "Sessions", value = "$totalWorkouts", modifier = Modifier.weight(1f))
+                    HistoryStatChip(label = "Total Time", value = "${totalMinutes}m", modifier = Modifier.weight(1f))
+                    HistoryStatChip(label = "Calories", value = "$totalCalories", modifier = Modifier.weight(1f))
+                }
+            }
+
             item {
                 Text("Activity Trends", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(Modifier.height(12.dp))
@@ -159,6 +173,24 @@ private fun ManualWorkoutDialog(onDismiss: () -> Unit, onSave: (String, Int, Int
 }
 
 @Composable
+private fun HistoryStatChip(label: String, value: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(2.dp))
+            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@Composable
 private fun WorkoutSessionHistoryCard(session: WorkoutSession, onDelete: () -> Unit) {
     val date = LocalDate.ofEpochDay(session.dateEpochDay)
     val primary = MaterialTheme.colorScheme.primary
@@ -187,11 +219,10 @@ private fun WorkoutSessionHistoryCard(session: WorkoutSession, onDelete: () -> U
                 contentAlignment = Alignment.Center
             ) {
                 if (imageModel != null) {
-                    coil3.compose.AsyncImage(
+                    com.stepstack.app.ui.components.FastImage(
                         model = imageModel,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Icon(Icons.Default.FitnessCenter, null, tint = primary, modifier = Modifier.size(24.dp))

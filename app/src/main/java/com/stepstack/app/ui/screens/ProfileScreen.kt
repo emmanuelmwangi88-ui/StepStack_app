@@ -19,6 +19,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,7 +42,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.stepstack.app.data.*
-import com.stepstack.app.ui.components.*
 import com.stepstack.app.ui.theme.*
 import com.stepstack.app.util.CloudinaryManager
 import com.stepstack.app.viewmodel.AppViewModel
@@ -143,7 +147,7 @@ fun ProfileScreen(
 
         SettingsGroup("Your Plan") {
             SettingsItem(
-                icon = Icons.Default.DirectionsWalk,
+                icon = Icons.AutoMirrored.Filled.DirectionsWalk,
                 iconColor = Color(0xFF2196F3),
                 label = "Daily Step Goal",
                 subLabel = "${"%,d".format(vm.customStepGoal)} steps",
@@ -190,8 +194,15 @@ fun ProfileScreen(
                 subLabel = vm.themeMode,
                 onClick = { showThemeDialog = true }
             )
+            SettingsItem(
+                icon = Icons.Default.BatteryChargingFull,
+                iconColor = Color(0xFFF44336),
+                label = "Battery Optimization",
+                subLabel = if (vm.isBatteryOptimizationIgnored) "Optimized for Background ✨" else "Background restricted ⚠️",
+                onClick = { vm.requestIgnoreBatteryOptimizations(context) }
+            )
             SettingsToggleItem(
-                icon = Icons.Default.VolumeUp,
+                icon = Icons.AutoMirrored.Filled.VolumeUp,
                 iconColor = Color(0xFF00BCD4),
                 label = "Audio Cues",
                 checked = vm.soundCues,
@@ -234,7 +245,7 @@ fun ProfileScreen(
             ),
             shape = RoundedCornerShape(16.dp)
         ) {
-            Icon(Icons.Default.Logout, null, modifier = Modifier.size(18.dp))
+            Icon(Icons.AutoMirrored.Filled.Logout, null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text("Logout", fontWeight = FontWeight.Bold)
         }
@@ -343,7 +354,7 @@ private fun ProfileHero(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    val icons = listOf(Icons.Default.Person, Icons.Default.DirectionsRun, Icons.Default.EmojiEvents, Icons.Default.Insights, Icons.Default.FitnessCenter)
+                    val icons = listOf(Icons.Default.Person, Icons.AutoMirrored.Filled.DirectionsRun, Icons.Default.EmojiEvents, Icons.Default.Insights, Icons.Default.FitnessCenter)
                     Icon(icons[vm.profilePicIndex % icons.size], null, tint = Color.White, modifier = Modifier.size(30.dp))
                 }
                 // camera badge
@@ -449,7 +460,7 @@ private fun QuickStatsRow(vm: AppViewModel) {
         )
         QuickStatCard(
             modifier = Modifier.weight(1f),
-            icon = Icons.Default.DirectionsWalk,
+            icon = Icons.AutoMirrored.Filled.DirectionsWalk,
             iconColor = Color(0xFF2196F3),
             value = formatCompact(vm.totalLifetimeSteps),
             label = "Total steps"
@@ -797,9 +808,9 @@ private fun OptionSelectionDialog(title: String, options: List<String>, onSelect
 @Composable
 fun getAchievementIcon(icon: String): ImageVector {
     return when (icon) {
-        "footprint" -> Icons.Default.DirectionsWalk
+        "footprint" -> Icons.AutoMirrored.Filled.DirectionsWalk
         "calendar" -> Icons.Default.CalendarToday
-        "steps" -> Icons.Default.DirectionsRun
+        "steps" -> Icons.AutoMirrored.Filled.DirectionsRun
         "flame" -> Icons.Default.Whatshot
         "dumbbell" -> Icons.Default.FitnessCenter
         "trophy" -> Icons.Default.EmojiEvents
@@ -807,7 +818,7 @@ fun getAchievementIcon(icon: String): ImageVector {
         "water_drop" -> Icons.Default.Opacity
         "wb_sunny" -> Icons.Default.WbSunny
         "bedtime" -> Icons.Default.Bedtime
-        "trending_up" -> Icons.Default.TrendingUp
+        "trending_up" -> Icons.AutoMirrored.Filled.TrendingUp
         "insights" -> Icons.Default.Insights
         else -> Icons.Default.EmojiEvents
     }

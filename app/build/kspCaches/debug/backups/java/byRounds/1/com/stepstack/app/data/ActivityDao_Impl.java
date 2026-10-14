@@ -66,7 +66,7 @@ public final class ActivityDao_Impl implements ActivityDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR ABORT INTO `workout_sessions` (`id`,`workoutId`,`workoutName`,`dateEpochDay`,`durationActualMin`,`completedPercent`,`exercisesCompleted`,`caloriesBurned`,`startTimeMillis`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?)";
+        return "INSERT OR ABORT INTO `workout_sessions` (`id`,`workoutId`,`workoutName`,`dateEpochDay`,`durationActualMin`,`completedPercent`,`exercisesCompleted`,`caloriesBurned`,`startTimeMillis`,`thumbnailUrl`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?)";
       }
 
       @Override
@@ -81,6 +81,7 @@ public final class ActivityDao_Impl implements ActivityDao {
         statement.bindLong(7, entity.getExercisesCompleted());
         statement.bindLong(8, entity.getCaloriesBurned());
         statement.bindLong(9, entity.getStartTimeMillis());
+        statement.bindString(10, entity.getThumbnailUrl());
       }
     };
     this.__insertionAdapterOfStepEventEntity = new EntityInsertionAdapter<StepEventEntity>(__db) {
@@ -356,6 +357,7 @@ public final class ActivityDao_Impl implements ActivityDao {
           final int _cursorIndexOfExercisesCompleted = CursorUtil.getColumnIndexOrThrow(_cursor, "exercisesCompleted");
           final int _cursorIndexOfCaloriesBurned = CursorUtil.getColumnIndexOrThrow(_cursor, "caloriesBurned");
           final int _cursorIndexOfStartTimeMillis = CursorUtil.getColumnIndexOrThrow(_cursor, "startTimeMillis");
+          final int _cursorIndexOfThumbnailUrl = CursorUtil.getColumnIndexOrThrow(_cursor, "thumbnailUrl");
           final List<WorkoutSessionEntity> _result = new ArrayList<WorkoutSessionEntity>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final WorkoutSessionEntity _item;
@@ -377,7 +379,9 @@ public final class ActivityDao_Impl implements ActivityDao {
             _tmpCaloriesBurned = _cursor.getInt(_cursorIndexOfCaloriesBurned);
             final long _tmpStartTimeMillis;
             _tmpStartTimeMillis = _cursor.getLong(_cursorIndexOfStartTimeMillis);
-            _item = new WorkoutSessionEntity(_tmpId,_tmpWorkoutId,_tmpWorkoutName,_tmpDateEpochDay,_tmpDurationActualMin,_tmpCompletedPercent,_tmpExercisesCompleted,_tmpCaloriesBurned,_tmpStartTimeMillis);
+            final String _tmpThumbnailUrl;
+            _tmpThumbnailUrl = _cursor.getString(_cursorIndexOfThumbnailUrl);
+            _item = new WorkoutSessionEntity(_tmpId,_tmpWorkoutId,_tmpWorkoutName,_tmpDateEpochDay,_tmpDurationActualMin,_tmpCompletedPercent,_tmpExercisesCompleted,_tmpCaloriesBurned,_tmpStartTimeMillis,_tmpThumbnailUrl);
             _result.add(_item);
           }
           return _result;

@@ -27,7 +27,6 @@ fun AppNavHost(
     workoutVm: WorkoutViewModel = viewModel(),
     snackbarHostState: SnackbarHostState,
     padding: PaddingValues = PaddingValues(0.dp),
-    onLogSteps: () -> Unit,
     onLogOutdoor: () -> Unit,
     onStartWalk: () -> Unit
 ) {
@@ -175,8 +174,7 @@ fun AppNavHost(
             }
         }
         composable(Route.WorkoutComplete.route) {
-            val summaryState by workoutVm.workoutSummary.collectAsState()
-            val summary = remember { summaryState }
+            val summary by workoutVm.workoutSummary.collectAsState()
 
             summary?.let { s ->
                 WorkoutCompleteScreen(
