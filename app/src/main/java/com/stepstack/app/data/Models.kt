@@ -1,5 +1,6 @@
 package com.stepstack.app.data
 
+import com.google.firebase.firestore.IgnoreExtraProperties
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -343,11 +344,12 @@ enum class FriendshipStatus {
     BLOCKED
 }
 
+@IgnoreExtraProperties
 @Serializable
 data class Friendship(
-    val userId: String,
-    val friendId: String,
-    val status: FriendshipStatus,
+    val userId: String = "",
+    val friendId: String = "",
+    val status: FriendshipStatus = FriendshipStatus.PENDING,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
@@ -358,6 +360,7 @@ enum class ChallengeVisibility {
     COMMUNITY
 }
 
+@IgnoreExtraProperties
 @Serializable
 data class Challenge(
     val id: String = "",
@@ -373,15 +376,18 @@ data class Challenge(
     val participantIds: List<String> = emptyList()
 )
 
+@IgnoreExtraProperties
 @Serializable
 data class ChallengeParticipant(
-    val challengeId: String,
-    val userId: String,
+    val challengeId: String = "",
+    val userId: String = "",
     val status: ParticipantStatus = ParticipantStatus.INVITED,
     val cumulativeSteps: Int = 0,
+    val daysHit: Int = 0,
     val joinedAt: Long = System.currentTimeMillis()
 )
 
+@IgnoreExtraProperties
 @Serializable
 data class FirestoreUser(
     val uid: String = "",
@@ -389,5 +395,9 @@ data class FirestoreUser(
     val displayName: String = "",
     val avatarUrl: String = "",
     val lastSyncedStepCount: Int = 0,
+    val todaySteps: Int = 0,
+    val todayEpochDay: Long = 0,
+    val weekSteps: Int = 0,
+    val weekStartEpochDay: Long = 0,
     val lastSyncedAt: Long = 0
 )

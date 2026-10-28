@@ -254,8 +254,9 @@ fun ProfileScreen(
     }
 
     if (showGoalDialog) {
-        OptionSelectionDialog("Fitness Goal", GoalType.entries.map { it.label }, {
-            vm.updateProfile(context, vm.user.name, GoalType.entries.find { g -> g.label == it }!!, vm.user.activityLevel, vm.user.equipment)
+        OptionSelectionDialog("Fitness Goal", GoalType.entries.map { it.label }, { label ->
+            val selectedGoal = GoalType.entries.find { g -> g.label == label } ?: vm.user.goal
+            vm.updateProfile(context, vm.user.name, selectedGoal, vm.user.activityLevel, vm.user.equipment)
             showGoalDialog = false
         }, { showGoalDialog = false })
     }
@@ -266,14 +267,16 @@ fun ProfileScreen(
         }, { showStepGoalDialog = false })
     }
     if (showActivityDialog) {
-        OptionSelectionDialog("Activity Level", ActivityLevel.entries.map { it.label }, {
-            vm.updateProfile(context, vm.user.name, vm.user.goal, ActivityLevel.entries.find { a -> a.label == it }!!, vm.user.equipment)
+        OptionSelectionDialog("Activity Level", ActivityLevel.entries.map { it.label }, { label ->
+            val selectedActivity = ActivityLevel.entries.find { a -> a.label == label } ?: vm.user.activityLevel
+            vm.updateProfile(context, vm.user.name, vm.user.goal, selectedActivity, vm.user.equipment)
             showActivityDialog = false
         }, { showActivityDialog = false })
     }
     if (showEquipmentDialog) {
-        OptionSelectionDialog("Equipment", Equipment.entries.map { it.label }, {
-            vm.updateProfile(context, vm.user.name, vm.user.goal, vm.user.activityLevel, Equipment.entries.find { e -> e.label == it }!!)
+        OptionSelectionDialog("Equipment", Equipment.entries.map { it.label }, { label ->
+            val selectedEquipment = Equipment.entries.find { e -> e.label == label } ?: vm.user.equipment
+            vm.updateProfile(context, vm.user.name, vm.user.goal, vm.user.activityLevel, selectedEquipment)
             showEquipmentDialog = false
         }, { showEquipmentDialog = false })
     }

@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "todayEpochDay", "order": "ASCENDING" },
+        { "fieldPath": "todaySteps", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "weekStartEpochDay", "order": "ASCENDING" },
+        { "fieldPath": "weekSteps", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

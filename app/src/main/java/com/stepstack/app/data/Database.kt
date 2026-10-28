@@ -85,6 +85,9 @@ interface AchievementDao {
 
     @Query("UPDATE achievements SET unlocked = :unlocked WHERE id = :id")
     suspend fun updateUnlocked(id: String, unlocked: Boolean)
+
+    @Query("DELETE FROM achievements")
+    suspend fun clearAchievements()
 }
 
 @Dao
@@ -101,6 +104,9 @@ interface ActivityDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertActivity(activity: DailyActivityEntity)
 
+    @Query("DELETE FROM daily_activity")
+    suspend fun clearDailyActivity()
+
     @Query("SELECT * FROM workout_sessions ORDER BY dateEpochDay DESC")
     suspend fun getAllSessions(): List<WorkoutSessionEntity>
     
@@ -110,6 +116,9 @@ interface ActivityDao {
     @Query("DELETE FROM workout_sessions WHERE workoutId = :id AND dateEpochDay = :day")
     suspend fun deleteSession(id: String, day: Long)
 
+    @Query("DELETE FROM workout_sessions")
+    suspend fun clearWorkoutSessions()
+
     @Insert
     suspend fun insertStepEvent(event: StepEventEntity)
 
@@ -118,6 +127,9 @@ interface ActivityDao {
 
     @Query("SELECT timestamp FROM step_events WHERE epochDay = :day")
     suspend fun getStepEventsForDay(day: Long): List<Long>
+
+    @Query("DELETE FROM step_events")
+    suspend fun clearStepEvents()
 }
 
 class Converters {

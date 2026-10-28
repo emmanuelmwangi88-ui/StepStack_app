@@ -27,6 +27,8 @@ class StepTrackerService : Service() {
 
     companion object {
         private val _stepDetectorEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+        const val ACTION_RESET_TRACKING = "com.stepstack.app.RESET_TRACKING"
+
         val stepDetectorEvents = _stepDetectorEvents.asSharedFlow()
 
         private val _todaySteps = MutableStateFlow(0)
@@ -41,6 +43,18 @@ class StepTrackerService : Service() {
         fun updateWorkout(name: String?, seconds: Int?) {
             _activeWorkoutName.value = name
             _workoutTimerSeconds.value = seconds
+        }
+
+        fun resetTracking(context: Context) {
+            _todaySteps.value = 0
+            try {
+                val intent = Intent(context, StepTrackerService::class.java).apply {
+                    action = ACTION_RESET_TRACKING
+                }
+                context.startService(intent)
+            } catch (e: Exception) {
+                Log.e("StepTrackerService", "Error resetting tracking", e)
+            }
         }
     }
 
@@ -186,7 +200,15 @@ class StepTrackerService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Sticky ensures Android tries to restart the service if killed
+        if (intent?.action == ACTION_RESET_TRACKING) {
+            currentSteps = 0
+            lastSavedSteps = 0
+            _todaySteps.value = 0
+            if (::counterManager.isInitialized) {
+                counterManager.resetForNewUser()
+            }
+            updateNotification()
+        }
         return START_STICKY
     }
 

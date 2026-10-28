@@ -3,18 +3,15 @@ package com.stepstack.app.ui.screens
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,12 +22,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -83,7 +76,7 @@ fun CompetitionHomeScreen(
 
         Box(modifier = Modifier.fillMaxSize()) {
             when (selectedTab) {
-                0 -> LeaderboardTab(vm, onOpenFriend)
+                0 -> LeaderboardScreen(history = vm.activityHistory.toList(), onOpenProfile = onOpenFriend)
                 1 -> FriendsTab(vm, onOpenFriend)
                 2 -> ChallengesTab(vm, onOpenChallenge)
             }
@@ -311,511 +304,7 @@ fun SegmentedTabs(tabs: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     Spacer(modifier = Modifier.height(8.dp))
 }
 
-@Composable
-fun LeaderboardTab(vm: AppViewModel, onOpenFriend: (String) -> Unit) {
-    val scope = rememberCoroutineScope()
-    val currentUid = FirebaseManager.userId ?: "demo_me"
 
-    val me = remember(vm.user.name, vm.user.email, vm.user.photoUrl, vm.todayActivity.steps) {
-        FirestoreUser(
-            uid = currentUid,
-            displayName = vm.user.name.ifBlank { "You" },
-            username = vm.user.email.split("@").firstOrNull()?.ifBlank { "athlete" } ?: "athlete",
-            avatarUrl = vm.user.photoUrl,
-            lastSyncedStepCount = vm.todayActivity.steps,
-            lastSyncedAt = System.currentTimeMillis()
-        )
-    }
-
-    val leaderboardUsers = remember(vm.allUsers.toList(), vm.todayActivity.steps, me) {
-        val list = vm.allUsers.toMutableList()
-        val index = list.indexOfFirst { it.uid == currentUid }
-        if (index >= 0) {
-            val existing = list[index]
-            list[index] = existing.copy(
-                displayName = vm.user.name.ifBlank { existing.displayName },
-                avatarUrl = vm.user.photoUrl.ifBlank { existing.avatarUrl },
-                lastSyncedStepCount = maxOf(existing.lastSyncedStepCount, vm.todayActivity.steps)
-            )
-        } else {
-            list.add(me)
-        }
-        list.sortedByDescending { it.lastSyncedStepCount }
-    }
-
-    val topLeaderSteps = leaderboardUsers.firstOrNull()?.lastSyncedStepCount ?: 1
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (vm.isFriendsLoading && leaderboardUsers.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.height(12.dp))
-                    Text("Loading live scores...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        } else if (leaderboardUsers.isEmpty()) {
-            EmptyState(
-                icon = Icons.Default.EmojiEvents,
-                title = "No racers on the board yet",
-                body = "Sign in and log your daily steps to compete on the global leaderboard.",
-            )
-        } else {
-            val podium = leaderboardUsers.take(3)
-            val rest = leaderboardUsers.drop(3)
-            val myRank = leaderboardUsers.indexOfFirst { it.uid == currentUid } + 1
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 96.dp)
-            ) {
-                item {
-                    PodiumSection(
-                        podium = podium,
-                        myUid = currentUid,
-                        friends = vm.friends,
-                        onAddFriend = { uid ->
-                            scope.launch {
-                                FirebaseManager.sendFriendRequest(uid)
-                                vm.refreshCompetitionData()
-                            }
-                        },
-                        onOpenFriend = onOpenFriend
-                    )
-                }
-
-                if (rest.isNotEmpty()) {
-                    item {
-                        Text(
-                            "Leaderboard Rankings",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Black,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
-                        )
-                    }
-
-                    itemsIndexed(rest) { index, user ->
-                        val rank = index + 4
-                        val isMe = user.uid == currentUid
-                        val isFriend = vm.friends.any { it.uid == user.uid }
-
-                        LeaderboardRow(
-                            user = user,
-                            rank = rank,
-                            isMe = isMe,
-                            isFriend = isFriend,
-                            topLeaderSteps = topLeaderSteps,
-                            onAddFriend = {
-                                scope.launch {
-                                    FirebaseManager.sendFriendRequest(user.uid)
-                                    vm.refreshCompetitionData()
-                                }
-                            },
-                            onClick = { onOpenFriend(user.uid) }
-                        )
-                    }
-                }
-            }
-
-            // Floating "My Position" Banner
-            if (myRank > 0) {
-                val myUser = leaderboardUsers.firstOrNull { it.uid == currentUid } ?: me
-                val topUser = leaderboardUsers.firstOrNull()
-                val gapToLeader = if (topUser != null) (topUser.lastSyncedStepCount - myUser.lastSyncedStepCount).coerceAtLeast(0) else 0
-
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
-                        .fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shadowElevation = 8.dp,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(36.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text("#$myRank", fontWeight = FontWeight.Black, color = Color.White, fontSize = 14.sp)
-                                }
-                            }
-
-                            Spacer(Modifier.width(12.dp))
-
-                            Column {
-                                Text(
-                                    "Your Position (#$myRank)",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                                Text(
-                                    if (myRank == 1) "👑 You are leading today's race!" else "🔥 ${formatNumber(gapToLeader)} steps behind #1",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                )
-                            }
-                        }
-
-                        Text(
-                            formatNumber(myUser.lastSyncedStepCount),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontFamily = StepDigits,
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PodiumSection(
-    podium: List<FirestoreUser>,
-    myUid: String,
-    friends: List<FirestoreUser>,
-    onAddFriend: (String) -> Unit,
-    onOpenFriend: (String) -> Unit
-) {
-    val first = podium.getOrNull(0)
-    val second = podium.getOrNull(1)
-    val third = podium.getOrNull(2)
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 20.dp, horizontal = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = Color(0xFFFFB347), modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Daily Top Racers", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                // 2nd Place
-                second?.let {
-                    PodiumSpot(
-                        user = it,
-                        rank = 2,
-                        avatarSize = 64.dp,
-                        badgeColor = Color(0xFFC0C0C0),
-                        medal = "🥈",
-                        myUid = myUid,
-                        isFriend = friends.any { f -> f.uid == it.uid },
-                        onAddFriend = { onAddFriend(it.uid) },
-                        onClick = { onOpenFriend(it.uid) },
-                        modifier = Modifier.weight(1f)
-                    )
-                } ?: Spacer(Modifier.weight(1f))
-
-                // 1st Place (Center - Elevated)
-                first?.let {
-                    PodiumSpot(
-                        user = it,
-                        rank = 1,
-                        avatarSize = 80.dp,
-                        badgeColor = Color(0xFFFFD700),
-                        medal = "👑",
-                        myUid = myUid,
-                        isFriend = friends.any { f -> f.uid == it.uid },
-                        onAddFriend = { onAddFriend(it.uid) },
-                        onClick = { onOpenFriend(it.uid) },
-                        modifier = Modifier.weight(1.1f)
-                    )
-                } ?: Spacer(Modifier.weight(1.1f))
-
-                // 3rd Place
-                third?.let {
-                    PodiumSpot(
-                        user = it,
-                        rank = 3,
-                        avatarSize = 60.dp,
-                        badgeColor = Color(0xFFCD7F32),
-                        medal = "🥉",
-                        myUid = myUid,
-                        isFriend = friends.any { f -> f.uid == it.uid },
-                        onAddFriend = { onAddFriend(it.uid) },
-                        onClick = { onOpenFriend(it.uid) },
-                        modifier = Modifier.weight(1f)
-                    )
-                } ?: Spacer(Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@Composable
-fun PodiumSpot(
-    user: FirestoreUser,
-    rank: Int,
-    avatarSize: Dp,
-    badgeColor: Color,
-    medal: String,
-    myUid: String,
-    isFriend: Boolean,
-    onAddFriend: () -> Unit,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val isMe = user.uid == myUid
-
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .clickable { onClick() }
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(contentAlignment = Alignment.TopCenter) {
-            Box(
-                modifier = Modifier
-                    .size(avatarSize + 8.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.sweepGradient(
-                            listOf(badgeColor, badgeColor.copy(alpha = 0.5f), badgeColor)
-                        )
-                    )
-                    .padding(4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" })
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(avatarSize)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentScale = ContentScale.Crop
-                )
-            }
-
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset(y = 10.dp),
-                shape = CircleShape,
-                color = badgeColor,
-                shadowElevation = 4.dp
-            ) {
-                Text(
-                    text = "$medal #$rank",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Black,
-                    color = Color.Black,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        Text(
-            if (isMe) "You" else user.displayName,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        Text(
-            formatNumber(user.lastSyncedStepCount),
-            style = MaterialTheme.typography.labelMedium,
-            fontFamily = StepDigits,
-            fontWeight = FontWeight.ExtraBold,
-            color = badgeColor
-        )
-
-        if (!isMe && !isFriend) {
-            Spacer(Modifier.height(4.dp))
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.clickable { onAddFriend() }
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.PersonAdd, null, modifier = Modifier.size(10.dp), tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(3.dp))
-                    Text("Add", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun LeaderboardRow(
-    user: FirestoreUser,
-    rank: Int,
-    isMe: Boolean,
-    isFriend: Boolean,
-    topLeaderSteps: Int,
-    onAddFriend: () -> Unit,
-    onClick: () -> Unit
-) {
-    val progress = (user.lastSyncedStepCount.toFloat() / topLeaderSteps.toFloat().coerceAtLeast(1f)).coerceIn(0.05f, 1f)
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 4.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isMe) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(
-            1.dp,
-            if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-        )
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            "#$rank",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Black,
-                            color = if (isMe) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(user.avatarUrl.ifBlank { "https://ui-avatars.com/api/?name=${user.displayName}&background=random" })
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentScale = ContentScale.Crop
-                )
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = if (isMe) "You" else user.displayName,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (isMe) {
-                            Spacer(Modifier.width(6.dp))
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.primary
-                            ) {
-                                Text(
-                                    "YOU",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                )
-                            }
-                        }
-                    }
-                    Text(
-                        text = "@${user.username}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                if (!isMe && !isFriend) {
-                    IconButton(onClick = onAddFriend, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.PersonAdd, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                    }
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                Text(
-                    text = formatNumber(user.lastSyncedStepCount),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontFamily = StepDigits,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            // Relative Step Progress Bar
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(progress)
-                        .clip(CircleShape)
-                        .background(
-                            if (isMe) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f)
-                        )
-                )
-            }
-        }
-    }
-}
 
 @Composable
 fun FriendsTab(vm: AppViewModel, onOpenFriend: (String) -> Unit) {
@@ -1199,8 +688,9 @@ fun ChallengesTab(vm: AppViewModel, onOpenChallenge: (String) -> Unit) {
 @Composable
 fun FeaturedChallengeCard(challenge: Challenge, onClick: () -> Unit) {
     val displayImage = remember(challenge.id, challenge.imageUrl) {
-        if (challenge.imageUrl.isNotBlank()) challenge.imageUrl
-        else "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=2070&auto=format&fit=crop"
+        challenge.imageUrl.ifBlank {
+            "https://images.unsplash.com/photo-1552674605-db6ffd4facb5?q=80&w=2070&auto=format&fit=crop"
+        }
     }
 
     val daysLeft = remember(challenge.endDate) {
@@ -1337,10 +827,12 @@ fun EmptyState(
     icon: ImageVector,
     title: String,
     body: String,
-    modifier: Modifier = Modifier.fillMaxWidth()
+    modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.padding(vertical = 48.dp, horizontal = 32.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp, horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Surface(
@@ -1366,11 +858,8 @@ fun EmptyState(
 
 @Composable
 fun ChallengeFlatCard(challenge: Challenge, onClick: () -> Unit) {
-    val progress = if (challenge.dailyGoalTarget != null && challenge.dailyGoalTarget > 0) 0.5f else 0.2f
-
     val displayImage = remember(challenge.id, challenge.imageUrl) {
-        if (challenge.imageUrl.isNotBlank()) challenge.imageUrl
-        else {
+        challenge.imageUrl.ifBlank {
             val photoIds = listOf(
                 "1552674605-db6ffd4facb5",
                 "1517836357463-d25dfeac3438",

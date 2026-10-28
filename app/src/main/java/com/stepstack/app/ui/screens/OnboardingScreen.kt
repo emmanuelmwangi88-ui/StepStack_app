@@ -63,7 +63,29 @@ fun OnboardingScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets.systemBars
+        contentWindowInsets = WindowInsets.systemBars,
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = {
+                    if (step > 0) step--
+                    else onBackToAuth()
+                }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+
+                if (step == 0) {
+                    TextButton(onClick = onNavigateToSignIn) {
+                        Text("Sign In", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                    }
+                }
+            }
+        }
     ) { innerPadding ->
         Column(
             modifier = Modifier
