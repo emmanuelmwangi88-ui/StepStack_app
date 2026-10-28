@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -60,7 +61,7 @@ fun AppNavHost(
         modifier = Modifier.fillMaxSize(),
     ) {
         composable(Route.Home.route) {
-            val allWorkouts by workoutVm.allWorkouts.collectAsState()
+            val allWorkouts by workoutVm.allWorkouts.collectAsStateWithLifecycle()
             HomeScreen(
                 vm = vm,
                 workoutVm = workoutVm,
@@ -122,10 +123,17 @@ fun AppNavHost(
         }
         composable(Route.ChallengeDetail.route) { entry ->
             val id = entry.arguments?.getString("id") ?: return@composable
-            ChallengeDetailScreen(
+            ChallengeScreen(
                 challengeId = id,
+                history = vm.activityHistory.toList(),
                 onBack = { navController.popBackStack() },
-                vm = vm
+                onOpenProfile = { navController.navigate(Route.FriendProfile.createRoute(it)) }
+            )
+        }
+        composable(Route.Leaderboard.route) {
+            LeaderboardScreen(
+                history = vm.activityHistory.toList(),
+                onOpenProfile = { navController.navigate(Route.FriendProfile.createRoute(it)) }
             )
         }
         composable(Route.WorkoutDetail.route) { entry ->
@@ -148,7 +156,7 @@ fun AppNavHost(
             )
         }
         composable(Route.GuidedWorkout.route) {
-            val activeState by workoutVm.activeWorkout.collectAsState()
+            val activeState by workoutVm.activeWorkout.collectAsStateWithLifecycle()
             
             LaunchedEffect(activeState?.isFinished) {
                 if (activeState?.isFinished == true) {
@@ -174,7 +182,7 @@ fun AppNavHost(
             }
         }
         composable(Route.WorkoutComplete.route) {
-            val summary by workoutVm.workoutSummary.collectAsState()
+            val summary by workoutVm.workoutSummary.collectAsStateWithLifecycle()
 
             summary?.let { s ->
                 WorkoutCompleteScreen(
