@@ -355,8 +355,9 @@ class AppViewModel : ViewModel() {
                 }
                 
                 val remoteAllUsers = FirebaseManager.getAllUsers()
+                val combinedUsers = (remoteAllUsers + SampleData.sampleCommunityUsers).distinctBy { it.uid }
                 allUsers.clear()
-                allUsers.addAll(remoteAllUsers)
+                allUsers.addAll(combinedUsers)
             } catch (e: Exception) {
                 Log.e("AppViewModel", "Error refreshing competition data", e)
             } finally {
@@ -446,6 +447,7 @@ class AppViewModel : ViewModel() {
         updateStreak()
         saveData(context)
         checkAchievements()
+        syncWithFirebase()
     }
 
     fun updateProfilePhoto(context: Context, photoUrl: String) {
@@ -650,9 +652,9 @@ class AppViewModel : ViewModel() {
     }
 
     fun resetOnboarding(context: Context) {
-        onboardingComplete = false
-        isDemoMode = false
-        saveData(context)
+        viewModelScope.launch {
+            clearUserData(context)
+        }
     }
 
     fun completeOnboarding(context: Context, draft: OnboardingDraft, isDemo: Boolean = false) {
@@ -840,18 +842,54 @@ class AppViewModel : ViewModel() {
         themeMode = mode; saveData(context)
     }
 
-    fun logout(context: Context) {
-        val currentPhoto = user.photoUrl.ifBlank { savedProfilePhoto }
-        FirebaseManager.logout()
+    suspend fun clearUserData(context: Context) {
+        periodicSyncJob?.cancel()
+
+        if (::db.isInitialized) {
+            try {
+                db.activityDao().clearDailyActivity()
+                db.activityDao().clearWorkoutSessions()
+                db.activityDao().clearStepEvents()
+                db.achievementDao().clearAchievements()
+                val initial = SampleData.achievements.map { a ->
+                    AchievementEntity(a.id, a.title, a.description, a.icon, false)
+                }
+                db.achievementDao().insertAchievements(initial)
+            } catch (e: Exception) {
+                Log.e("AppViewModel", "Error clearing database on logout", e)
+            }
+        }
+
+        user = User()
+        savedProfilePhoto = ""
         onboardingComplete = false
         isDemoMode = false
-        user = User()
-        if (currentPhoto.isNotBlank()) {
-            savedProfilePhoto = currentPhoto
-            val p = prefs ?: context.getSharedPreferences("stepstack_prefs", Context.MODE_PRIVATE)
-            p.edit().putString("saved_profile_photo", currentPhoto).apply()
+        waterIntake.intValue = 0
+        activityHistory.clear()
+        sessions.clear()
+        bodyStats.clear()
+        activeChallenges.clear()
+        friends.clear()
+        allUsers.clear()
+        appNotifications.clear()
+        walkCurrentSteps = 0
+        isWalking = false
+        customStepGoal = 8000
+        graceDaysRemaining = 3
+        achievements.clear()
+        achievements.addAll(SampleData.achievements.map { it.copy(unlocked = false) })
+
+        val p = prefs ?: context.getSharedPreferences("stepstack_prefs", Context.MODE_PRIVATE)
+        p.edit().clear().apply()
+
+        StepTrackerService.resetTracking(context)
+    }
+
+    fun logout(context: Context) {
+        viewModelScope.launch {
+            FirebaseManager.logout()
+            clearUserData(context)
         }
-        saveData(context)
     }
 
     fun syncFromFirebase(context: Context, onResult: (Boolean) -> Unit = {}) {
@@ -863,14 +901,18 @@ class AppViewModel : ViewModel() {
         isSyncing = true
         viewModelScope.launch {
             try {
+                clearUserData(context)
+
                 val remoteUser = FirebaseManager.fetchUser()
                 if (remoteUser != null) {
                     user = remoteUser
                 } else {
                     val emailStr = firebaseUser.email ?: ""
-                    val nameStr = firebaseUser.displayName ?: emailStr.split("@").firstOrNull() ?: "Athlete"
-                    val photo = firebaseUser.photoUrl?.toString()?.ifBlank { savedProfilePhoto } ?: savedProfilePhoto
-                    user = user.copy(
+                    val nameStr = firebaseUser.displayName?.ifBlank { null }
+                        ?: emailStr.split("@").firstOrNull()?.ifBlank { "Athlete" }
+                        ?: "Athlete"
+                    val photo = firebaseUser.photoUrl?.toString() ?: ""
+                    user = User(
                         name = nameStr,
                         email = emailStr,
                         photoUrl = photo
@@ -878,19 +920,12 @@ class AppViewModel : ViewModel() {
                 }
                 if (user.photoUrl.isNotBlank()) {
                     savedProfilePhoto = user.photoUrl
-                } else if (savedProfilePhoto.isNotBlank()) {
-                    user = user.copy(photoUrl = savedProfilePhoto)
                 }
                 onboardingComplete = true
                 isDemoMode = false
                 saveData(context)
-                startPeriodicSync()
-                refreshCompetitionData()
-                onResult(true)
-            } catch (e: Exception) {
-                onboardingComplete = true
-                isDemoMode = false
-                saveData(context)
+
+                syncWithFirebase()
                 startPeriodicSync()
                 refreshCompetitionData()
                 onResult(true)
