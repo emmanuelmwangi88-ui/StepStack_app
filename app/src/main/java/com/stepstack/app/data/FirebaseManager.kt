@@ -3,11 +3,55 @@ package com.stepstack.app.data
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import java.time.LocalDate
+
+fun DocumentSnapshot.toFirestoreUserSafe(): FirestoreUser? {
+    if (!exists()) return null
+    return try {
+        val docId = id
+        val rawUid = getString("uid")
+        val uidVal = if (!rawUid.isNullOrBlank()) rawUid else docId
+
+        val rawUsername = getString("username")
+        val rawEmail = getString("email")
+        val usernameVal = when {
+            !rawUsername.isNullOrBlank() -> rawUsername
+            !rawEmail.isNullOrBlank() -> rawEmail.split("@").firstOrNull() ?: "athlete"
+            else -> "athlete"
+        }
+
+        val rawName = getString("displayName") ?: getString("name")
+        val displayNameVal = when {
+            !rawName.isNullOrBlank() -> rawName
+            else -> usernameVal.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        }
+
+        val avatarUrlVal = getString("avatarUrl") ?: getString("photoUrl") ?: ""
+
+        val stepsVal = (get("lastSyncedStepCount") as? Number)?.toInt()
+            ?: (get("steps") as? Number)?.toInt()
+            ?: 0
+
+        val lastSyncedVal = (get("lastSyncedAt") as? Number)?.toLong() ?: 0L
+
+        FirestoreUser(
+            uid = uidVal,
+            username = usernameVal,
+            displayName = displayNameVal,
+            avatarUrl = avatarUrlVal,
+            lastSyncedStepCount = stepsVal,
+            lastSyncedAt = lastSyncedVal
+        )
+    } catch (e: Exception) {
+        Log.e("FirebaseManager", "Error parsing FirestoreUser from document ${this.id}", e)
+        null
+    }
+}
 
 object FirebaseManager {
 
@@ -177,19 +221,20 @@ object FirebaseManager {
                 .limit(100)
                 .get()
                 .await()
-            snapshot.documents.mapNotNull { doc ->
-                val u = doc.toObject(FirestoreUser::class.java) ?: return@mapNotNull null
-                val uid = if (u.uid.isBlank()) doc.id else u.uid
-                val name = if (u.displayName.isBlank()) {
-                    if (u.username.isNotBlank()) u.username else "Athlete"
-                } else u.displayName
-                val uname = if (u.username.isBlank()) "athlete" else u.username
-                val userFixed = u.copy(uid = uid, displayName = name, username = uname)
-                
-                if (userFixed.displayName.lowercase().contains(q) || userFixed.username.lowercase().contains(q)) {
-                    userFixed
+
+            val firestoreResults = snapshot.documents.mapNotNull { doc ->
+                val u = doc.toFirestoreUserSafe() ?: return@mapNotNull null
+                if (u.displayName.lowercase().contains(q) || u.username.lowercase().contains(q)) {
+                    u
                 } else null
             }
+
+            val all = getAllUsers()
+            val rtdbResults = all.filter {
+                it.displayName.lowercase().contains(q) || it.username.lowercase().contains(q)
+            }
+
+            (firestoreResults + rtdbResults).distinctBy { it.uid }
         } catch (e: Exception) {
             Log.e("FirebaseManager", "Error searching users", e)
             emptyList()
@@ -270,8 +315,8 @@ object FirebaseManager {
             val requesterIds = snapshot.documents.mapNotNull { it.getString("userId") }
             if (requesterIds.isEmpty()) return emptyList()
             
-            requesterIds.chunked(30).flatMap { ids ->
-                firestore.collection("users").whereIn("uid", ids).get().await().toObjects(FirestoreUser::class.java)
+            requesterIds.mapNotNull { reqId ->
+                getFirestoreUser(reqId)
             }
         } catch (e: Exception) {
             Log.e("FirebaseManager", "Error getting pending friend requests", e)
@@ -297,8 +342,8 @@ object FirebaseManager {
             
             if (friendIds.isEmpty()) return emptyList()
             
-            friendIds.chunked(30).flatMap { ids ->
-                firestore.collection("users").whereIn("uid", ids).get().await().toObjects(FirestoreUser::class.java)
+            friendIds.mapNotNull { fId ->
+                getFirestoreUser(fId)
             }
         } catch (e: Exception) {
             Log.e("FirebaseManager", "Error getting friends", e)
@@ -316,135 +361,45 @@ object FirebaseManager {
         }
     }
 
-    suspend fun getAllUsers(): List<FirestoreUser> {
+    suspend fun getAllUsers(limit: Long = 50): List<FirestoreUser> {
         ensureAuth()
         val userMap = mutableMapOf<String, FirestoreUser>()
 
-        // 1. Fetch all users from Firestore
         try {
-            val firestoreSnapshot = firestore.collection("users").get().await()
+            val firestoreSnapshot = firestore.collection("users").limit(limit).get().await()
             for (doc in firestoreSnapshot.documents) {
-                val u = doc.toObject(FirestoreUser::class.java) ?: continue
-                val uid = if (u.uid.isNotBlank()) u.uid else doc.id
-                val name = if (u.displayName.isNotBlank()) u.displayName else if (u.username.isNotBlank()) u.username else "Athlete"
-                val username = if (u.username.isNotBlank()) u.username else u.displayName.ifBlank { "athlete" }
-                val steps = (doc.get("lastSyncedStepCount")?.toString()?.toIntOrNull()) ?: u.lastSyncedStepCount
-                userMap[uid] = u.copy(uid = uid, displayName = name, username = username, lastSyncedStepCount = steps)
+                val u = doc.toFirestoreUserSafe() ?: continue
+                userMap[u.uid] = u
             }
         } catch (e: Exception) {
             Log.e("FirebaseManager", "Error fetching firestore users", e)
-        }
-
-        // 2. Fetch dailySteps records from Firestore
-        try {
-            val dailyStepsSnapshot = firestore.collection("dailySteps").get().await()
-            for (doc in dailyStepsSnapshot.documents) {
-                val uId = doc.getString("userId") ?: continue
-                val stepVal = (doc.get("stepCount")?.toString()?.toIntOrNull()) ?: 0
-                if (stepVal > 0) {
-                    val existing = userMap[uId]
-                    if (existing != null) {
-                        userMap[uId] = existing.copy(
-                            lastSyncedStepCount = maxOf(existing.lastSyncedStepCount, stepVal)
-                        )
-                    } else {
-                        userMap[uId] = FirestoreUser(
-                            uid = uId,
-                            username = "athlete",
-                            displayName = "Runner",
-                            lastSyncedStepCount = stepVal
-                        )
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("FirebaseManager", "Error fetching dailySteps from Firestore", e)
-        }
-
-        // 3. Fetch all users from Realtime Database to ensure no RTDB user is missed
-        try {
-            val rtdbSnapshot = rtdb.getReference("users").get().await()
-            if (rtdbSnapshot.exists()) {
-                val children = rtdbSnapshot.children
-                for (child in children) {
-                    val uid = child.key ?: continue
-                    val valMap = child.value as? Map<*, *> ?: continue
-                    val name = (valMap["name"] as? String) ?: (valMap["displayName"] as? String) ?: ""
-                    val email = (valMap["email"] as? String) ?: ""
-                    val photoUrl = (valMap["photoUrl"] as? String) ?: ""
-                    val username = (valMap["username"] as? String) ?: email.split("@").firstOrNull()?.ifBlank { "athlete" } ?: "athlete"
-                    val displayName = name.ifBlank { username.replaceFirstChar { it.uppercase() } }
-                    val rtdbSteps = (valMap["lastSyncedStepCount"]?.toString()?.toIntOrNull()) ?: (valMap["steps"]?.toString()?.toIntOrNull()) ?: 0
-
-                    val existing = userMap[uid]
-                    if (existing == null) {
-                        userMap[uid] = FirestoreUser(
-                            uid = uid,
-                            username = username,
-                            displayName = displayName,
-                            avatarUrl = photoUrl,
-                            lastSyncedStepCount = rtdbSteps
-                        )
-                    } else {
-                        userMap[uid] = existing.copy(
-                            displayName = existing.displayName.ifBlank { displayName },
-                            avatarUrl = existing.avatarUrl.ifBlank { photoUrl },
-                            lastSyncedStepCount = maxOf(existing.lastSyncedStepCount, rtdbSteps)
-                        )
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("FirebaseManager", "Error fetching RTDB users", e)
-        }
-
-        // 4. Fetch all activities from Realtime Database to update step scores
-        try {
-            val activitySnapshot = rtdb.getReference("activity").get().await()
-            if (activitySnapshot.exists()) {
-                for (userChild in activitySnapshot.children) {
-                    val uid = userChild.key ?: continue
-                    val days = userChild.children
-                    var maxSteps = 0
-                    for (dayChild in days) {
-                        val actMap = dayChild.value as? Map<*, *> ?: continue
-                        val steps = (actMap["steps"]?.toString()?.toIntOrNull()) ?: 0
-                        if (steps > maxSteps) maxSteps = steps
-                    }
-
-                    if (maxSteps > 0) {
-                        val existing = userMap[uid]
-                        if (existing != null) {
-                            userMap[uid] = existing.copy(
-                                lastSyncedStepCount = maxOf(existing.lastSyncedStepCount, maxSteps)
-                            )
-                        } else {
-                            userMap[uid] = FirestoreUser(
-                                uid = uid,
-                                username = "athlete",
-                                displayName = "Runner",
-                                lastSyncedStepCount = maxSteps
-                            )
-                        }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("FirebaseManager", "Error fetching RTDB activities", e)
         }
 
         return userMap.values.sortedByDescending { it.lastSyncedStepCount }
     }
 
     suspend fun getFirestoreUser(uid: String): FirestoreUser? {
+        if (uid.isBlank()) return null
         return try {
             val doc = firestore.collection("users").document(uid).get().await()
-            val u = doc.toObject(FirestoreUser::class.java) ?: return null
-            val resolvedUid = if (u.uid.isBlank()) doc.id else u.uid
-            val name = if (u.displayName.isBlank()) {
-                if (u.username.isNotBlank()) u.username else "Athlete"
-            } else u.displayName
-            u.copy(uid = resolvedUid, displayName = name)
+            if (doc.exists()) {
+                doc.toFirestoreUserSafe()
+            } else {
+                val rtdbSnap = rtdb.getReference("users").child(uid).get().await()
+                if (rtdbSnap.exists()) {
+                    val map = rtdbSnap.value as? Map<*, *>
+                    val name = map?.get("name") as? String ?: ""
+                    val email = map?.get("email") as? String ?: ""
+                    val photoUrl = map?.get("photoUrl") as? String ?: ""
+                    val username = email.split("@").firstOrNull()?.ifBlank { "athlete" } ?: "athlete"
+                    FirestoreUser(
+                        uid = uid,
+                        username = username,
+                        displayName = name.ifBlank { username.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } },
+                        avatarUrl = photoUrl
+                    )
+                } else null
+            }
         } catch (e: Exception) {
             Log.e("FirebaseManager", "Error fetching firestore user", e)
             null
@@ -458,11 +413,12 @@ object FirebaseManager {
     suspend fun createChallenge(challenge: Challenge, participantIds: List<String>) {
         val id = userId ?: return
         try {
-            val challengeRef = firestore.collection("challenges").document()
+            val docId = challenge.id.ifBlank { firestore.collection("challenges").document().id }
+            val challengeRef = firestore.collection("challenges").document(docId)
             val allParticipantIds = (participantIds + id).distinct()
             
             val challengeMap = mapOf(
-                "id" to challengeRef.id,
+                "id" to docId,
                 "title" to challenge.title,
                 "type" to challenge.type.name,
                 "visibility" to challenge.visibility.name,
@@ -479,7 +435,7 @@ object FirebaseManager {
             
             allParticipantIds.forEach { pId ->
                 val participant = ChallengeParticipant(
-                    challengeId = challengeRef.id,
+                    challengeId = docId,
                     userId = pId,
                     status = if (pId == id) ParticipantStatus.ACCEPTED else ParticipantStatus.INVITED
                 )
@@ -516,15 +472,7 @@ object FirebaseManager {
     }
 
     suspend fun deleteChallenge(challengeId: String) {
-        val id = userId ?: return
-        try {
-            val doc = firestore.collection("challenges").document(challengeId).get().await()
-            if (doc.getString("createdBy") == id) {
-                firestore.collection("challenges").document(challengeId).delete().await()
-            }
-        } catch (e: Exception) {
-            Log.e("FirebaseManager", "Error deleting challenge", e)
-        }
+        ChallengeRepository.delete(challengeId)
     }
 
     suspend fun getChallengeParticipants(challengeId: String): List<ChallengeParticipant> {
@@ -549,15 +497,14 @@ object FirebaseManager {
     }
 
     suspend fun joinChallenge(challengeId: String) {
-        val id = userId ?: return
-        try {
-            firestore.collection("challenges").document(challengeId)
-                .collection("participants").document(id)
-                .update("status", ParticipantStatus.ACCEPTED.name, "joinedAt", System.currentTimeMillis())
-                .await()
-        } catch (e: Exception) {
-            Log.e("FirebaseManager", "Error joining challenge", e)
+        val c = getChallenge(challengeId)
+        if (c != null) {
+            ChallengeRepository.join(c, wasInvited = false)
         }
+    }
+
+    suspend fun joinChallenge(challenge: Challenge, wasInvited: Boolean = false) {
+        ChallengeRepository.join(challenge, wasInvited)
     }
 
     // endregion
