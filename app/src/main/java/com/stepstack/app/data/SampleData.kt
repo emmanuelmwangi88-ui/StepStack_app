@@ -620,6 +620,17 @@ object SampleData {
 
     val masterExercises: List<Exercise> = workouts.flatMap { it.exercises }.distinctBy { it.name }
 
+    val sampleCommunityUsers: List<FirestoreUser> = listOf(
+        FirestoreUser(uid = "user_alex", username = "alex_fit", displayName = "Alex Rivera", avatarUrl = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400", lastSyncedStepCount = 14250),
+        FirestoreUser(uid = "user_sarah", username = "sarah_runner", displayName = "Sarah Chen", avatarUrl = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400", lastSyncedStepCount = 12800),
+        FirestoreUser(uid = "user_marcus", username = "marcus_k", displayName = "Marcus Vance", avatarUrl = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400", lastSyncedStepCount = 11400),
+        FirestoreUser(uid = "user_elena", username = "elena_steps", displayName = "Elena Rostova", avatarUrl = "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=400", lastSyncedStepCount = 9850),
+        FirestoreUser(uid = "user_david", username = "david_w", displayName = "David Wright", avatarUrl = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400", lastSyncedStepCount = 8900),
+        FirestoreUser(uid = "user_chloe", username = "chloe_p", displayName = "Chloe Parker", avatarUrl = "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=400", lastSyncedStepCount = 7600),
+        FirestoreUser(uid = "user_liam", username = "liam_fit", displayName = "Liam O'Connor", avatarUrl = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=400", lastSyncedStepCount = 6400),
+        FirestoreUser(uid = "user_maya", username = "maya_s", displayName = "Maya Sharma", avatarUrl = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400", lastSyncedStepCount = 5200)
+    )
+
     val workoutPlans: List<WorkoutPlan> = listOf(
         WorkoutPlan(
             id = "p1",

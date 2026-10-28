@@ -33,6 +33,7 @@ import com.stepstack.app.viewmodel.WorkoutViewModel
 import com.stepstack.app.ui.components.WorkoutSessionCard
 
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.stepstack.app.ui.theme.StepStackTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,16 +44,16 @@ fun WorkoutsScreen(
     onOpenWorkout: (Workout) -> Unit,
     onOpenBuilder: () -> Unit = {},
 ) {
-    val selectedDifficulty by viewModel.selectedDifficulty.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val favorites by viewModel.favoriteIds.collectAsState()
-    val favoritesOnly by viewModel.showFavoritesOnly.collectAsState()
+    val selectedDifficulty by viewModel.selectedDifficulty.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val favorites by viewModel.favoriteIds.collectAsStateWithLifecycle()
+    val favoritesOnly by viewModel.showFavoritesOnly.collectAsStateWithLifecycle()
 
     var selectedCategory by remember { mutableStateOf<WorkoutCategory?>(null) }
     var selectedEquipment by remember { mutableStateOf<Equipment?>(null) }
     var selectedDuration by remember { mutableStateOf<String?>(null) } // "Under 10", "10-20", "20+"
 
-    val allWorkouts by viewModel.allWorkouts.collectAsState()
+    val allWorkouts by viewModel.allWorkouts.collectAsStateWithLifecycle()
     val filtered = remember(allWorkouts, searchQuery, selectedDifficulty, favoritesOnly, favorites, selectedCategory, selectedEquipment, selectedDuration) {
         allWorkouts.filter { workout ->
             val matchesSearch = searchQuery.isEmpty() ||

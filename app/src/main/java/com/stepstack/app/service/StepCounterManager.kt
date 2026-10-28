@@ -137,6 +137,18 @@ class StepCounterManager(context: Context) : SensorEventListener {
     }
 
     private fun handleCounterEvent(currentRawValue: Int) {
+        // If baseline has not been established for today, set it directly to the current raw value.
+        if (baselineSteps == -1) {
+            Log.i("StepCounterManager", "Setting initial step baseline to $currentRawValue")
+            baselineSteps = currentRawValue
+            baselineEpochDay = LocalDate.now().toEpochDay()
+            lastKnownRawValue = currentRawValue
+            confirmedSteps = 0
+            provisionalExtra = 0
+            onStepUpdate?.invoke(0)
+            return
+        }
+
         val previousRaw = lastKnownRawValue
 
         // REBOOT DETECTION: raw counter resets to a small number after a device reboot.
@@ -145,9 +157,8 @@ class StepCounterManager(context: Context) : SensorEventListener {
             val todayStepsBeforeReboot = (previousRaw - baselineSteps).coerceAtLeast(0)
             baselineSteps = currentRawValue - todayStepsBeforeReboot
         }
-
         // SANITY CHECK: guard against implausible single-event jumps.
-        if (previousRaw != -1) {
+        else if (previousRaw != -1) {
             val delta = currentRawValue - previousRaw
             if (delta > MAX_PLAUSIBLE_STEPS_PER_EVENT) {
                 Log.w("StepCounterManager", "Implausible step jump ($delta) — adjusting baseline.")
@@ -157,11 +168,6 @@ class StepCounterManager(context: Context) : SensorEventListener {
         }
 
         lastKnownRawValue = currentRawValue
-
-        if (baselineSteps == -1) {
-            baselineSteps = lastKnownRawValue
-            baselineEpochDay = LocalDate.now().toEpochDay()
-        }
 
         val todaySteps = (lastKnownRawValue - baselineSteps).coerceAtLeast(0)
 
@@ -185,6 +191,16 @@ class StepCounterManager(context: Context) : SensorEventListener {
             provisionalExtra = 0
             onStepUpdate?.invoke(0)
         }
+    }
+
+    /**
+     * Resets all persisted baselines and counts when logging out or switching accounts.
+     */
+    fun resetForNewUser() {
+        prefs.edit().clear().apply()
+        confirmedSteps = 0
+        provisionalExtra = 0
+        onStepUpdate?.invoke(0)
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
