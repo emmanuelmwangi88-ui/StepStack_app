@@ -6,6 +6,7 @@ sealed class Route(val route: String) {
     data object Steps : Route("steps")
     data object Profile : Route("profile")
     data object Competition : Route("competition")
+    data object Leaderboard : Route("leaderboard")
     data object FriendProfile : Route("friend_profile/{uid}") {
         fun createRoute(uid: String) = "friend_profile/$uid"
     }
