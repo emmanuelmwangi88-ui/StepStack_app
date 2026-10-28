@@ -2,46 +2,134 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // User Profiles
+    // ---------- helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Field is absent, or an int within [0, max]. Stops fake 9-million-step days.
+    function validSteps(data, field, maxVal) {
+      return !(field in data)
+        || (data[field] is int && data[field] >= 0 && data[field] <= maxVal);
+    }
+
+    function challengeDoc(challengeId) {
+      return get(/databases/$(database)/documents/challenges/$(challengeId)).data;
+    }
+
+    // ---------- users ----------
+    // Readable by any signed-in user (needed for leaderboards / friend search).
+    // Never store email, phone or other private data in these documents.
     match /users/{userId} {
-      allow read: if request.auth != null; // Everyone can read profiles to search/view friends
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if signedIn();
+      allow create, update: if isSelf(userId)
+        && validSteps(request.resource.data, 'lastSyncedStepCount', 200000)
+        && validSteps(request.resource.data, 'todaySteps', 200000)
+        && validSteps(request.resource.data, 'weekSteps', 1400000);
+      allow delete: if isSelf(userId);
     }
 
-    // Friendships
+    // ---------- friendships ----------
     match /friendships/{friendshipId} {
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || resource.data.friendId == request.auth.uid);
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if request.auth != null && (resource.data.userId == request.auth.uid || resource.data.friendId == request.auth.uid);
-    }
-
-    // Daily Steps
-    match /dailySteps/{stepId} {
-      allow read: if request.auth != null && (
+      allow read: if signedIn() && (
         resource.data.userId == request.auth.uid ||
-        exists(/databases/$(database)/documents/friendships/$(request.auth.uid + "_" + resource.data.userId)) ||
-        exists(/databases/$(database)/documents/friendships/$(resource.data.userId + "_" + request.auth.uid))
+        resource.data.friendId == request.auth.uid
       );
-      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.friendId != request.auth.uid;
+      allow update, delete: if signedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.friendId == request.auth.uid
+      );
     }
 
-    // Challenges
-    match /challenges/{challengeId} {
-      allow read: if request.auth != null && (
-        exists(/databases/$(database)/documents/challenges/$(challengeId)/participants/$(request.auth.uid))
+    // ---------- dailySteps ----------
+    // Document id MUST be "<uid>_<epochDay>". That binding is what stops one user
+    // from overwriting another user's day by writing userId = their own uid.
+    match /dailySteps/{stepId} {
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid ||
+        exists(/databases/$(database)/documents/friendships/$(request.auth.uid + '_' + resource.data.userId)) ||
+        exists(/databases/$(database)/documents/friendships/$(resource.data.userId + '_' + request.auth.uid))
       );
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && resource.data.createdBy == request.auth.uid;
 
-      // Participants Subcollection
+      allow create: if isSelf(request.resource.data.userId)
+        && stepId == request.auth.uid + '_' + string(request.resource.data.epochDay)
+        && validSteps(request.resource.data, 'stepCount', 200000);
+
+      allow update: if isSelf(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId
+        && stepId == request.auth.uid + '_' + string(request.resource.data.epochDay)
+        && validSteps(request.resource.data, 'stepCount', 200000);
+
+      allow delete: if isSelf(resource.data.userId);
+    }
+
+    // ---------- challenges ----------
+    match /challenges/{challengeId} {
+
+      // Participants (listed on the doc) or anyone, if the challenge is COMMUNITY.
+      // Works with the app's two queries: whereArrayContains(participantIds) and
+      // whereEqualTo(visibility, COMMUNITY).
+      allow read: if signedIn() && (
+        resource.data.visibility == 'COMMUNITY' ||
+        request.auth.uid in resource.data.participantIds
+      );
+
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.auth.uid in request.resource.data.participantIds
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 80;
+
+      allow update: if signedIn() && (
+        // creator edits (but can't hand the challenge to someone else)
+        (resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdBy == resource.data.createdBy)
+        ||
+        // anyone may add ONLY themselves to a COMMUNITY challenge's participantIds
+        (resource.data.visibility == 'COMMUNITY'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participantIds'])
+          && request.auth.uid in request.resource.data.participantIds)
+      );
+
+      allow delete: if signedIn() && resource.data.createdBy == request.auth.uid;
+
       match /participants/{participantId} {
-        allow read: if request.auth != null && (
-          exists(/databases/$(database)/documents/challenges/$(challengeId)/participants/$(request.auth.uid))
+        allow read: if signedIn() && (
+          challengeDoc(challengeId).visibility == 'COMMUNITY' ||
+          request.auth.uid in challengeDoc(challengeId).participantIds
         );
-        allow write: if request.auth != null && (
-          request.auth.uid == participantId || // Can update own status
-          get(/databases/$(database)/documents/challenges/$(challengeId)).data.createdBy == request.auth.uid // Creator can manage
-        );
+
+        // Self row: creator's own row, a community self-join, or an invitee row.
+        // Creator may also create INVITED rows for friends.
+        allow create: if signedIn()
+          && request.resource.data.userId == participantId
+          && validSteps(request.resource.data, 'cumulativeSteps', 5000000)
+          && (
+            (isSelf(participantId) && (
+              challengeDoc(challengeId).visibility == 'COMMUNITY' ||
+              request.auth.uid in challengeDoc(challengeId).participantIds
+            ))
+            ||
+            (challengeDoc(challengeId).createdBy == request.auth.uid
+              && request.resource.data.status == 'INVITED')
+          );
+
+        // Only the participant updates their own row (accept / decline / publish progress).
+        allow update: if isSelf(participantId)
+          && request.resource.data.userId == resource.data.userId
+          && validSteps(request.resource.data, 'cumulativeSteps', 5000000)
+          && validSteps(request.resource.data, 'daysHit', 3660);
+
+        allow delete: if isSelf(participantId)
+          || challengeDoc(challengeId).createdBy == request.auth.uid;
       }
     }
   }
