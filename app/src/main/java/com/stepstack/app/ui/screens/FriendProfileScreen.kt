@@ -102,7 +102,7 @@ fun FriendProfileScreen(
                 Text("User not found", color = DarkOnSurface)
             }
         } else {
-            val u = friend!!
+            val u = friend ?: return@Scaffold
             Column(
                 modifier = Modifier
                     .fillMaxSize()

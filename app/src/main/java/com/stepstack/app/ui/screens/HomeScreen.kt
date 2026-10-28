@@ -26,6 +26,7 @@ import coil3.compose.AsyncImage
 import com.stepstack.app.data.*
 import com.stepstack.app.ui.components.*
 import com.stepstack.app.ui.theme.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.stepstack.app.viewmodel.AppViewModel
 import com.stepstack.app.viewmodel.WorkoutViewModel
 import java.time.format.DateTimeFormatter
@@ -94,7 +95,7 @@ fun HomeScreen(
 
     var showTargetInfo by remember { mutableStateOf(false) }
     var selectedDayInfo by remember { mutableStateOf<DailyActivity?>(null) }
-    val favoriteIds by workoutVm.favoriteIds.collectAsState()
+    val favoriteIds by workoutVm.favoriteIds.collectAsStateWithLifecycle()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(

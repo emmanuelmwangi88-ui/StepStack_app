@@ -130,7 +130,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     var showSplash by remember { mutableStateOf(true) }
-                    var showAuth by remember { mutableStateOf(false) }
+                    var showOnboarding by remember { mutableStateOf(false) }
 
                     if (showSplash) {
                         com.stepstack.app.ui.screens.SplashScreen { showSplash = false }
@@ -138,42 +138,30 @@ class MainActivity : ComponentActivity() {
                         Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                             CircularProgressIndicator()
                         }
-                    } else if (showAuth) {
-                        com.stepstack.app.ui.screens.AuthScreen(
-                            savedProfilePhoto = vm.savedProfilePhoto,
-                            onAuthSuccess = { 
-                                vm.syncFromFirebase(context) { success ->
-                                    if (success) {
-                                        showAuth = false
-                                    } else {
-                                        // If sync failed (e.g. new user), we stay in auth/onboarding
-                                        showAuth = false 
-                                    }
-                                }
-                            },
-                            onNavigateToOnboarding = { showAuth = false }
-                        )
-                    } else if (!vm.onboardingComplete) {
-                        OnboardingScreen(
-                            onComplete = { vm.completeOnboarding(context, it, isDemo = false) },
-                            onSkipAuth = { vm.completeOnboarding(context, it, isDemo = true) },
-                            onBackToAuth = { /* no-op */ },
-                            onNavigateToSignIn = { showAuth = true }
-                        )
-                    } else if (isLoggedIn || vm.isDemoMode) {
+                    } else if ((isLoggedIn || vm.isDemoMode) && vm.onboardingComplete) {
                         MainApp(vm)
+                    } else if (showOnboarding) {
+                        OnboardingScreen(
+                            onComplete = { draft ->
+                                vm.completeOnboarding(context, draft, isDemo = false)
+                                showOnboarding = false
+                            },
+                            onSkipAuth = { draft ->
+                                vm.completeOnboarding(context, draft, isDemo = true)
+                                showOnboarding = false
+                            },
+                            onBackToAuth = { showOnboarding = false },
+                            onNavigateToSignIn = { showOnboarding = false }
+                        )
                     } else {
                         com.stepstack.app.ui.screens.AuthScreen(
                             savedProfilePhoto = vm.savedProfilePhoto,
                             onAuthSuccess = { 
                                 vm.syncFromFirebase(context) { _ ->
-                                    showAuth = false
+                                    showOnboarding = false
                                 }
                             },
-                            onNavigateToOnboarding = { 
-                                // If the user wants to "Get Started" again, allow them to see onboarding
-                                vm.resetOnboarding(context)
-                            }
+                            onNavigateToOnboarding = { showOnboarding = true }
                         )
                     }
                 }
