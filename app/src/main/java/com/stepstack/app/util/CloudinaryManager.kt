@@ -9,14 +9,12 @@ import com.cloudinary.android.callback.UploadCallback
 object CloudinaryManager {
     
     private const val CLOUD_NAME = "dnt3lcyoj"
-    private const val API_KEY = "REDACTED"
-    // Using Unsigned Uploads to remove the need for API_SECRET in the app
+    // Using Unsigned Uploads to remove the need for API_KEY or API_SECRET in the app
     private const val UPLOAD_PRESET = "stepstack"
 
     fun init(context: Context) {
         val config = mapOf(
             "cloud_name" to CLOUD_NAME,
-            "api_key" to API_KEY,
             "secure" to true
         )
         try {
