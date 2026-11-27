@@ -4,14 +4,12 @@ import com.stepstack.app.data.Challenge
 import com.stepstack.app.data.ChallengeRepository
 import com.stepstack.app.data.ChallengeType
 import com.stepstack.app.data.DailyActivity
-import com.stepstack.app.data.LeaderboardEntry
 import com.stepstack.app.data.LeaderboardPeriod
 import com.stepstack.app.data.LeaderboardRepository
 import com.stepstack.app.data.currentStreakDays
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.DayOfWeek
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -35,7 +33,6 @@ class LogicUnitTest {
 
     @Test
     fun testWeekStartIsMonday() {
-        val now = LocalDate.now()
         val mondayEpoch = LeaderboardRepository.weekStartEpoch()
         val mondayDate = LocalDate.ofEpochDay(mondayEpoch)
 
