@@ -4,14 +4,12 @@ import com.stepstack.app.data.Challenge
 import com.stepstack.app.data.ChallengeRepository
 import com.stepstack.app.data.ChallengeType
 import com.stepstack.app.data.DailyActivity
-import com.stepstack.app.data.LeaderboardEntry
 import com.stepstack.app.data.LeaderboardPeriod
 import com.stepstack.app.data.LeaderboardRepository
 import com.stepstack.app.data.currentStreakDays
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.DayOfWeek
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -20,7 +18,7 @@ class LogicUnitTest {
     @Test
     fun testStreakCalculation() {
         val today = LocalDate.now().toEpochDay()
-        
+
         // 3 consecutive days meeting goal ending yesterday
         val history = listOf(
             DailyActivity(epochDay = today - 3, steps = 10000, workoutMinutes = 0, goalForDay = 8000),
@@ -64,18 +62,4 @@ class LogicUnitTest {
     @Test
     fun testChallengeDayRangeAndTotalDays() {
         val zone = ZoneId.systemDefault()
-        val startMs = LocalDate.of(2025, 1, 1).atStartOfDay(zone).toInstant().toEpochMilli()
-        val endMs = LocalDate.of(2025, 1, 7).atStartOfDay(zone).toInstant().toEpochMilli()
-
-        val challenge = Challenge(
-            id = "c1",
-            title = "Sprint",
-            type = ChallengeType.RACE_TOTAL_STEPS,
-            startDate = startMs,
-            endDate = endMs
-        )
-
-        val totalDays = ChallengeRepository.totalDays(challenge)
-        assertEquals(7, totalDays)
-    }
-}
+        val startMs = LocalDate.of(2025, 1, 1).atStartOfDay(zone).toInst
